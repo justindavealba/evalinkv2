@@ -2,14 +2,11 @@ import React, { useState } from "react";
 import axios from "axios"; // Import axios
 import "./AddUserModal.css";
 
-export default function AddFacultyModal({
-  onClose,
-  onAddFaculty,
-  departments,
-}) {
+export default function AddFacultyModal({ onClose, onSuccess, departments }) {
   const [formData, setFormData] = useState({
     id: "",
     name: "",
+    email: "",
     password: "",
     department_id: "", // This will hold the selected department ID
   });
@@ -24,16 +21,19 @@ export default function AddFacultyModal({
     const payload = { ...formData, role: "faculty" }; // Add role to payload
     try {
       const response = await axios.post("http://localhost:3001/users", payload); // Send POST request
-      if (response.data.error) {
-        alert("Error adding faculty: " + response.data.error);
-      } else {
+      if (response.data.message) {
         alert(response.data.message);
-        onAddFaculty(formData); // Call original callback
-        onClose();
+        onSuccess(); // Use the unified success handler
+        onClose(); // Close the modal
       }
     } catch (error) {
-      console.error("There was an error sending the data!", error);
-      alert("Failed to connect to the server or add faculty.");
+      if (error.response && error.response.data && error.response.data.error) {
+        // Display the specific error message from the server
+        alert(`Error: ${error.response.data.error}`);
+      } else {
+        console.error("There was an error sending the data!", error);
+        alert("Failed to connect to the server or add faculty.");
+      }
     }
   };
 
@@ -43,14 +43,15 @@ export default function AddFacultyModal({
         <h2>Add New Faculty</h2>
         <form onSubmit={handleSubmit} className="add-user-form">
           <div className="form-group">
-            <label htmlFor="id">Faculty ID</label>
+            <label htmlFor="id">Faculty ID / Number</label>
             <input
-              type="number"
+              type="text"
               id="id"
               name="id"
               value={formData.id}
               onChange={handleChange}
               required
+              autoComplete="off"
             />
           </div>
           <div className="form-group">
@@ -62,6 +63,18 @@ export default function AddFacultyModal({
               value={formData.name}
               onChange={handleChange}
               required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="email">Email</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              required
+              autoComplete="off"
             />
           </div>
           <div className="form-group">

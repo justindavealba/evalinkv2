@@ -1,180 +1,186 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback, useEffect } from "react";
+import axios from "axios";
 import "./EvaluateInstructor.css";
 
-export default function EvaluateInstructor({
-  subject,
-  onClose,
-  readOnly = false,
-}) {
-  const categories = [
-    {
-      name: "Teaching & Instruction",
-      items: [
-        "Explains concepts clearly and understandably.",
-        "Organizes lessons and materials effectively.",
-        "Encourages critical thinking and class participation.",
-        "Uses relevant examples or real-life applications.",
-      ],
-    },
-    {
-      name: "Communication",
-      items: [
-        "Speaks clearly and is easy to understand.",
-        "Listens to questions and answers them well.",
-        "Gives clear instructions for assignments, exams, and projects.",
-      ],
-    },
-    {
-      name: "Subject Knowledge",
-      items: [
-        "Demonstrates strong knowledge of the subject.",
-        "Stays updated with current developments in the field.",
-      ],
-    },
-    {
-      name: "Classroom Management",
-      items: [
-        "Maintains a respectful and productive learning environment.",
-        "Manages class time efficiently.",
-        "Treats students fairly and respectfully.",
-      ],
-    },
-    {
-      name: "Student Engagement",
-      items: [
-        "Motivates students to participate in discussions.",
-        "Encourages questions and interaction.",
-        "Provides opportunities for collaborative or practical learning.",
-      ],
-    },
-    {
-      name: "Assessment & Feedback",
-      items: [
-        "Assignments, quizzes, and exams fairly evaluate learning.",
-        "Provides timely and constructive feedback.",
-        "Grades are consistent and transparent.",
-      ],
-    },
-    {
-      name: "Accessibility & Support",
-      items: [
-        "Available for consultation or help outside class.",
-        "Supports students who need extra guidance.",
-      ],
-    },
-  ];
-
+export default function EvaluateInstructor({ subject, onClose, onSuccess }) {
+  const [evaluationCategories, setEvaluationCategories] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [ratings, setRatings] = useState({});
-  const [feedback, setFeedback] = useState("");
+  const [comments, setComments] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!readOnly) {
-      // Load saved ratings/feedback from localStorage if available (students only)
-      const saved = JSON.parse(
-        localStorage.getItem(`ratings_${subject.code}`) || "{}"
-      );
-      setRatings(saved.ratings || {});
-      setFeedback(saved.feedback || "");
-    } else {
-      // For faculty: load existing ratings/feedback (mocked for demo)
-      const saved = JSON.parse(
-        localStorage.getItem(`ratings_${subject.code}`) || "{}"
-      );
-      setRatings(saved.ratings || {});
-      setFeedback(saved.feedback || "");
-    }
-  }, [subject.code, readOnly]);
+    const fetchQuestions = async () => {
+      try {
+        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3001";
+        const response = await axios.get(`${apiUrl}/evaluation-questions`);
+        setEvaluationCategories(response.data);
+      } catch (err) {
+        setError("Failed to load evaluation questions.");
+        console.error("Error fetching questions:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchQuestions();
+  }, []);
 
-  const handleRatingChange = (key, value) => {
-    setRatings((prev) => ({ ...prev, [key]: value }));
-  };
+  // Safely calculate totalQuestions only if evaluationCategories is an array
+  const totalQuestions = Array.isArray(evaluationCategories)
+    ? evaluationCategories.reduce(
+        (acc, category) => acc + (category.questions?.length || 0),
+        0
+      )
+    : 0;
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (readOnly) return; // Should never happen
-    localStorage.setItem(
-      `ratings_${subject.code}`,
-      JSON.stringify({ ratings, feedback })
-    );
-    alert("Thank you! Your evaluation has been submitted.");
-    onClose();
-  };
+  const allQuestionsAnswered =
+    totalQuestions > 0 &&
+    Object.values(ratings).filter((rating) => rating > 0).length ===
+      totalQuestions;
+
+  const handleRatingChange = useCallback((questionId, rating) => {
+    setRatings((prev) => ({ ...prev, [questionId]: rating }));
+  }, []);
+
+  const handleSubmit = useCallback(
+    async (e) => {
+      e.preventDefault();
+      setError(null); // Clear previous errors
+
+      // Validate that all questions have been answered and questions are loaded
+      if (!allQuestionsAnswered) {
+        setError("Please answer all questions before submitting.");
+        return;
+      }
+
+      setIsSubmitting(true);
+      try {
+        // The backend expects a JSON object for the answers.
+        // The `ratings` state is already in the correct { questionId: rating } format.
+        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3001";
+        const response = await axios.post(
+          `${apiUrl}/evaluations`,
+          {
+            student_id: localStorage.getItem("userId"),
+            faculty_id: subject.faculty_id,
+            subject_id: subject.id,
+            section_id: subject.section_id || null,
+            answers: ratings,
+            comments: comments,
+          },
+          {
+            headers: {
+              "Content-Type": "application/json",
+              // Add auth token if required:
+              // "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+            },
+          }
+        );
+        alert(response.data.message); // Keeping alert for now, but a toast is better.
+        if (onSuccess) {
+          onSuccess(); // This will re-fetch the subjects on the dashboard
+        }
+        onClose(); // Close the modal on success.
+      } catch (error) {
+        // More detailed error logging
+        console.error(
+          "Error submitting evaluation:",
+          error.response ? error.response.data : error.message
+        );
+        setError(
+          error.response?.data?.error ||
+            "Failed to submit evaluation. Please try again."
+        );
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [ratings, comments, subject, onClose, onSuccess, allQuestionsAnswered]
+  );
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content">
-        <h2>
-          {readOnly ? "Feedback for" : "Evaluate"}: {subject.name}
-        </h2>
-        {subject.instructor && (
-          <p>
-            <strong>Instructor:</strong> {subject.instructor}
-          </p>
-        )}
+      <div className="modal-content evaluation-modal">
+        <h2>Evaluate: {subject.name}</h2>
+        <p>Instructor: {subject.faculty_name}</p>
+        <hr />
+        <form onSubmit={handleSubmit} noValidate>
+          {isLoading && <p>Loading questions...</p>}
+          {!isLoading && !evaluationCategories.length && (
+            <p className="error-message">
+              No evaluation questions are available at the moment. Please
+              contact an administrator.
+            </p>
+          )}
 
-        <form onSubmit={handleSubmit} className="evaluation-form">
-          {categories.map((cat) => (
-            <div key={cat.name} className="category-section">
-              <h3>{cat.name}</h3>
-              {cat.items.map((item, idx) => {
-                const key = `${cat.name}-${idx}`;
-                return (
-                  <div key={key} className="evaluation-item">
-                    <label>{item}</label>
-                    <select
-                      value={ratings[key] || ""}
-                      onChange={
-                        !readOnly
-                          ? (e) => handleRatingChange(key, e.target.value)
-                          : undefined
-                      }
-                      disabled={readOnly}
-                      required={!readOnly}
-                    >
-                      <option value="">
-                        {readOnly ? "-" : "Select Rating"}
-                      </option>
-                      <option value="5">5 - Outstanding</option>
-                      <option value="4">4 - Very Satisfactory</option>
-                      <option value="3">3 - Satisfactory</option>
-                      <option value="2">2 - Fair</option>
-                      <option value="1">1 - Poor</option>
-                    </select>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-
-          <div className="feedback-section">
-            <label>
-              Additional Feedback:
-              <textarea
-                value={feedback}
-                onChange={
-                  !readOnly ? (e) => setFeedback(e.target.value) : undefined
-                }
-                placeholder={readOnly ? "" : "Write your feedback here..."}
-                readOnly={readOnly}
-              />
-            </label>
+          <div className="questions-container">
+            {evaluationCategories.map((category) => (
+              <div
+                key={category.id || category.name}
+                className="category-section"
+              >
+                <h3 className="category-title">{category.name}</h3>
+                {Array.isArray(category.questions) &&
+                  category.questions.map((question) => (
+                    <div key={question.id} className="question-item">
+                      <p className="question-text">{question.text}</p>
+                      <div className="rating-scale">
+                        <span className="rating-label-text">Poor</span>
+                        <div className="rating-inputs">
+                          {[1, 2, 3, 4, 5].map((score) => (
+                            <label key={score} className="rating-button">
+                              <input
+                                type="radio"
+                                name={`question_${question.id}`}
+                                value={score}
+                                checked={ratings[question.id] === score}
+                                onChange={() =>
+                                  handleRatingChange(question.id, score)
+                                }
+                                required
+                              />
+                              <span>{score}</span>
+                            </label>
+                          ))}
+                        </div>
+                        <span className="rating-label-text">Excellent</span>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            ))}
           </div>
 
+          <div className="feedback-section">
+            <label htmlFor="comments">Additional Comments (Optional)</label>
+            <textarea
+              id="comments"
+              value={comments}
+              onChange={(e) => setComments(e.target.value)}
+              placeholder="Provide any other feedback here..."
+              rows="4"
+            ></textarea>
+          </div>
+
+          {error && <p className="error-message">{error}</p>}
+
           <div className="modal-buttons">
-            {!readOnly ? (
-              <>
-                <button type="submit" className="submit-btn">
-                  Submit Evaluation
-                </button>
-                <button type="button" className="cancel-btn" onClick={onClose}>
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <button type="button" className="cancel-btn" onClick={onClose}>
-                Close
-              </button>
-            )}
+            <button
+              type="button"
+              className="cancel-btn"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="submit-btn"
+              disabled={!allQuestionsAnswered || isSubmitting || isLoading}
+            >
+              {isSubmitting ? "Submitting..." : "Submit Evaluation"}
+            </button>
           </div>
         </form>
       </div>

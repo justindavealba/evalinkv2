@@ -2,14 +2,11 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "./AddUserModal.css";
 
-export default function AddSectionModal({
-  onClose,
-  onAddSection,
-  departments,
-}) {
+export default function AddSectionModal({ onClose, onSuccess, departments }) {
   const [formData, setFormData] = useState({
     name: "",
     department_id: "",
+    year_level: "",
   });
 
   const handleChange = (e) => {
@@ -18,7 +15,7 @@ export default function AddSectionModal({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.department_id) {
+    if (!formData.name || !formData.department_id || !formData.year_level) {
       alert("Please fill out all fields.");
       return;
     }
@@ -27,9 +24,11 @@ export default function AddSectionModal({
         "http://localhost:3001/sections",
         formData
       );
-      alert(response.data.message);
-      onAddSection();
-      onClose();
+      if (response.data.message) {
+        alert(response.data.message);
+        onSuccess(); // Use the unified success handler
+        onClose();
+      }
     } catch (error) {
       console.error("There was an error adding the section!", error);
       alert("Failed to add section.");
@@ -51,6 +50,25 @@ export default function AddSectionModal({
               onChange={handleChange}
               required
             />
+          </div>
+          <div className="form-group">
+            <label htmlFor="year_level">Year Level</label>
+            <select
+              id="year_level"
+              name="year_level"
+              value={formData.year_level}
+              onChange={handleChange}
+              required
+            >
+              <option value="" disabled>
+                Select Year Level
+              </option>
+              <option value="1">1st Year</option>
+              <option value="2">2nd Year</option>
+              <option value="3">3rd Year</option>
+              <option value="4">4th Year</option>
+              <option value="0">Irregular</option>
+            </select>
           </div>
           <div className="form-group">
             <label htmlFor="department_id">Department</label>

@@ -1,63 +1,56 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios"; // Import axios
+import React, { useState } from "react";
+import axios from "axios";
 import "./AddUserModal.css";
 
 export default function AddStudentModal({
   onClose,
-  onAddStudent,
+  onSuccess,
   departments,
+  sections,
 }) {
   const [formData, setFormData] = useState({
-    id: "",
+    id: "", // Student ID
     name: "",
+    email: "",
     password: "",
     department_id: "",
-    section_id: "",
-    year: "", // This will be set automatically
+    year_level: "",
+    section_id: "", // Optional
   });
-  const [allSections, setAllSections] = useState([]);
-
-  useEffect(() => {
-    // Fetch all sections when the modal mounts
-    axios
-      .get("http://localhost:3001/sections")
-      .then((res) => setAllSections(res.data))
-      .catch((err) => console.error("Failed to fetch sections", err));
-  }, []);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-
-    // When a section is selected, find its year level and update the form data
-    if (name === "section_id") {
-      const selectedSection = allSections.find(
-        (sec) => sec.id === parseInt(value)
-      );
-      if (selectedSection) {
-        setFormData((prev) => ({ ...prev, year: selectedSection.year_level }));
-      }
-    }
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
-    // Make function async
     e.preventDefault();
-    const payload = { ...formData, role: "student" }; // Add role to payload
+    const payload = { ...formData, role: "student" };
     try {
       const response = await axios.post("http://localhost:3001/users", payload); // Send POST request
-      if (response.data.error) {
-        alert("Error adding student: " + response.data.error);
-      } else {
+      if (response.data.message) {
         alert(response.data.message);
-        onAddStudent(formData); // Call original callback
+        onSuccess();
         onClose();
       }
     } catch (error) {
-      console.error("There was an error sending the data!", error);
-      alert("Failed to connect to the server or add student.");
+      if (error.response && error.response.data && error.response.data.error) {
+        alert(`Error: ${error.response.data.error}`);
+      } else {
+        console.error("There was an error sending the data!", error);
+        alert("Failed to connect to the server or add student.");
+      }
     }
   };
+
+  // Filter sections based on the selected department and year level
+  const availableSections =
+    formData.department_id && formData.year_level
+      ? sections.filter(
+          (section) =>
+            section.department_id === parseInt(formData.department_id) &&
+            section.year_level === parseInt(formData.year_level)
+        )
+      : sections; // Show all sections if department or year is not selected
 
   return (
     <div className="modal-overlay">
@@ -67,7 +60,7 @@ export default function AddStudentModal({
           <div className="form-group">
             <label htmlFor="id">Student ID</label>
             <input
-              type="number"
+              type="text"
               id="id"
               name="id"
               value={formData.id}
@@ -87,6 +80,18 @@ export default function AddStudentModal({
             />
           </div>
           <div className="form-group">
+            <label htmlFor="email">Email</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              required
+              autoComplete="off"
+            />
+          </div>
+          <div className="form-group">
             <label htmlFor="password">Password</label>
             <input
               type="password"
@@ -99,7 +104,7 @@ export default function AddStudentModal({
             />
           </div>
           <div className="form-group">
-            <label htmlFor="department">Department</label>
+            <label htmlFor="department_id">Department</label>
             <select
               id="department_id"
               name="department_id"
@@ -110,29 +115,43 @@ export default function AddStudentModal({
               <option value="" disabled>
                 Select Department
               </option>
-              {departments &&
-                departments.map((dept) => (
-                  <option key={dept.id} value={dept.id}>
-                    {dept.name}
-                  </option>
-                ))}
+              {departments.map((dept) => (
+                <option key={dept.id} value={dept.id}>
+                  {dept.name}
+                </option>
+              ))}
             </select>
           </div>
           <div className="form-group">
-            <label htmlFor="section_id">Section</label>
+            <label htmlFor="year_level">Year Level</label>
+            <select
+              id="year_level"
+              name="year_level"
+              value={formData.year_level}
+              onChange={handleChange}
+              required
+            >
+              <option value="" disabled>
+                Select Year
+              </option>
+              <option value="1">1st Year</option>
+              <option value="2">2nd Year</option>
+              <option value="3">3rd Year</option>
+              <option value="4">4th Year</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="section_id">Section (Optional for Irregular)</label>
             <select
               id="section_id"
               name="section_id"
               value={formData.section_id}
               onChange={handleChange}
-              required
             >
-              <option value="" disabled>
-                Select Section
-              </option>
-              {allSections.map((sec) => (
+              <option value="">Select Section</option>
+              {availableSections.map((sec) => (
                 <option key={sec.id} value={sec.id}>
-                  {sec.name} ({sec.year_level})
+                  {sec.name}
                 </option>
               ))}
             </select>

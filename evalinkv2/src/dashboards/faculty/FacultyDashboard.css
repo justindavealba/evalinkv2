@@ -100,6 +100,13 @@
   position: relative;
 }
 
+.header-profile-picture {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 .profile-icon {
   background: transparent;
   border: none;
@@ -285,32 +292,167 @@
   color: var(--accent-color);
 }
 
-/* ===== ACTIVITY LOG SECTION ===== */
-.activity-log-section .activity-item {
+/* ===== OVERVIEW SECTION ===== */
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 24px;
+}
+
+.stat-card-faculty {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background-color: #f9fafb;
+  padding: 24px;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.stat-card-faculty:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow);
+  border-color: var(--accent-color);
+}
+
+.stat-card-faculty-icon {
+  font-size: 2rem;
+  color: var(--accent-color);
+  background-color: #e0e8f9;
+  padding: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-card-faculty-info h4 {
+  margin: 0 0 8px 0;
+  font-size: 1rem;
+  color: var(--text-light);
+}
+
+.stat-card-faculty-info p {
+  margin: 0;
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: var(--primary-color);
+}
+
+/* Styles for Incident Report Section */
+.incident-section {
+  /* You can reuse styles from StudentDashboard.css if they are in a shared file */
+}
+
+.incident-form {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 5px;
+  gap: 16px;
+  margin-bottom: 40px;
+}
+
+.incident-form label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.incident-form input,
+.incident-form textarea {
+  padding: 12px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+.incident-form textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.submit-incident-btn {
+  background-color: var(--primary-color);
+  color: white;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  align-self: flex-start;
+  font-weight: 500;
+}
+
+.incident-history .incident-item {
+  border-bottom: 1px solid var(--border-color);
+  padding: 20px 15px;
+  position: relative;
+  background-color: #f9fafb;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border-color);
+}
+
+.incident-item-status-label {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 4px 10px;
+  border-top-right-radius: 8px;
+  border-bottom-left-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: white;
+}
+
+.incident-item-status-label.status-pending {
+  background-color: #d97706; /* Amber 600 */
+}
+
+.incident-item-status-label.status-under-investigation {
+  background-color: #2563eb; /* Blue 600 */
+}
+
+.incident-item-status-label.status-resolved {
+  background-color: #059669; /* Green 600 */
+}
+
+/* ===== ACTIVITY LOG SECTION ===== */
+.activity-log-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
   padding: 15px;
   border-radius: 8px;
   background-color: var(--bg-color);
   border: 1px solid var(--border-color);
-  margin-bottom: 10px;
 }
 
-.activity-log-section .activity-item:last-child {
-  margin-bottom: 0;
+.activity-icon {
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.activity-log-section .activity-type {
+.activity-details {
+  display: flex;
+  justify-content: space-between;
+  flex-grow: 1;
+}
+
+.activity-type {
   font-weight: 600;
-  color: var(--primary-color);
 }
 
-.activity-log-section .activity-item p {
-  margin: 0;
+.activity-time {
   color: var(--text-light);
-  font-size: 0.9rem;
 }
 
 /* ===== PROFILE PAGE ===== */
@@ -342,6 +484,48 @@
 
 .profile-info-new p strong {
   color: var(--text-color);
+}
+
+/* Add these styles for the profile picture and its container */
+.profile-icon-new {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative; /* This is crucial for the upload button positioning */
+}
+
+.profile-picture-new {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--primary-color);
+}
+
+/* Add this for the upload button */
+.upload-btn-new {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background-color: var(--primary-color);
+  color: white;
+  border: 2px solid white;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.upload-btn-new:hover {
+  background-color: var(--accent-color);
+  transform: scale(1.1);
 }
 
 /* ===== RESPONSIVE DESIGN ===== */

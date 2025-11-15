@@ -99,6 +99,29 @@
 .profile-section {
   position: relative;
 }
+.profile-icon-new {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative; /* This is crucial for the upload button positioning */
+}
+
+.profile-picture-new {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover; /* This is key to prevent image stretching */
+  border: 2px solid #1b1464;
+}
+
+.header-profile-picture {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
 
 .profile-icon {
   background: transparent;
@@ -123,6 +146,29 @@
   width: 150px;
   z-index: 1001;
   border: 1px solid var(--border-color);
+}
+
+.upload-btn-new {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background-color: var(--primary-color);
+  color: white;
+  border: 2px solid white;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.upload-btn-new:hover {
+  background-color: var(--accent-color);
+  transform: scale(1.1);
 }
 
 .profile-dropdown button {
@@ -247,6 +293,55 @@
   padding-bottom: 16px;
 }
 
+/* ===== OVERVIEW SECTION ===== */
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 24px;
+}
+
+.stat-card-student {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background-color: #f9fafb;
+  padding: 24px;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.stat-card-student:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow);
+  border-color: var(--accent-color);
+}
+
+.stat-card-student-icon {
+  font-size: 2rem;
+  color: var(--accent-color);
+  background-color: #e0e8f9;
+  padding: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-card-student-info h4 {
+  margin: 0 0 8px 0;
+  font-size: 1rem;
+  color: var(--text-light);
+}
+
+.stat-card-student-info p {
+  margin: 0;
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: var(--primary-color);
+}
+
 /* ===== SUBJECTS SECTION ===== */
 .subjects {
   display: grid;
@@ -277,7 +372,11 @@
   font-weight: 500;
   transition: background-color 0.2s ease;
 }
-
+.evaluate-btn.disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  border-color: #ccc;
+}
 .evaluate-btn:hover {
   background-color: var(--accent-color);
 }
@@ -335,12 +434,41 @@
 
 .incident-history .incident-item {
   border-bottom: 1px solid var(--border-color);
-  padding: 15px 0;
+  padding: 20px 15px;
   line-height: 1.6;
+  position: relative;
+  background-color: #f9fafb;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border-color);
 }
 
 .incident-history .incident-item:last-child {
   border-bottom: none;
+}
+
+.incident-item-status-label {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 4px 10px;
+  border-top-right-radius: 8px;
+  border-bottom-left-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: white;
+}
+
+.incident-item-status-label.status-pending {
+  background-color: #d97706; /* Amber 600 */
+}
+
+.incident-item-status-label.status-under-investigation {
+  background-color: #2563eb; /* Blue 600 */
+}
+
+.incident-item-status-label.status-resolved {
+  background-color: #059669; /* Green 600 */
 }
 
 /* ===== ACTIVITY LOG SECTION ===== */
@@ -364,6 +492,7 @@
   font-size: 1.2rem;
   display: flex;
   align-items: center;
+  justify-content: center;
 }
 
 .activity-details {

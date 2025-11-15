@@ -5,6 +5,10 @@ import AddFacultyModal from "./AddFacultyModal";
 import AddDepartmentModal from "./AddDepartmentModal"; // Import the new modal
 import AddSectionModal from "./AddSectionModal";
 import AddSubjectModal from "./AddSubjectModal";
+import AssignLoadModal from "./AssignLoadModal"; // Import the new assignment modal
+import AssignStudentSubjectModal from "./AssignStudentSubjectModal";
+import AddEvalCategoryModal from "./AddEvalCategoryModal"; // Import new modal
+import AddEvalQuestionModal from "./AddEvalQuestionModal"; // Import new modal
 import axios from "axios";
 import evalinkLogo from "../../assets/evalinklogo.png";
 import "./AdminDashboard.css";
@@ -22,10 +26,28 @@ import {
   FaUserCircle,
   FaTachometerAlt,
   FaClipboardCheck,
+  FaChartBar,
   FaExclamationCircle,
   FaHistory,
+  FaEdit, // Added for edit functionality
+  FaBook, // Icon for assigning subjects
+  FaUserPlus,
+  FaChalkboardTeacher,
+  FaBuilding,
+  FaUsers,
+  FaBookOpen,
+  FaClipboardList,
+  FaUserGraduate,
   FaUsersCog, // New icon for User Management
+  FaQuestionCircle, // Icon for Evaluation Management
   FaTrash,
+  FaPlus,
+  FaHourglassHalf, // Icon for Pending
+  FaSearch, // Icon for Investigation
+  FaCheckCircle as FaCheckCircleSolid, // Using solid version for Resolved
+  FaSignInAlt, // For Login activity
+  FaSignOutAlt, // For Logout activity
+  FaExclamationTriangle, // For Incident reports
 } from "react-icons/fa";
 
 ChartJS.register(
@@ -37,10 +59,20 @@ ChartJS.register(
   Legend
 );
 
+const statusIcons = {
+  Pending: <FaHourglassHalf />,
+  "Under Investigation": <FaSearch />,
+  Resolved: <FaCheckCircleSolid />,
+};
+
+const STATUS_ORDER = ["Pending", "Under Investigation", "Resolved"];
+
 export default function AdminDashboard({ setUserRole }) {
   const [activeSection, setActiveSection] = useState(
     localStorage.getItem("adminActiveSection") || "overview"
   );
+  const [userManagementTab, setUserManagementTab] = useState("students");
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showDropdown, setShowDropdown] = useState(false);
   const navigate = useNavigate();
@@ -49,58 +81,38 @@ export default function AdminDashboard({ setUserRole }) {
   const [showAddDepartmentModal, setShowAddDepartmentModal] = useState(false); // State for the new modal
   const [showAddSectionModal, setShowAddSectionModal] = useState(false);
   const [showAddSubjectModal, setShowAddSubjectModal] = useState(false);
+  const [showAssignLoadModal, setShowAssignLoadModal] = useState(false);
+  const [showAssignStudentSubjectModal, setShowAssignStudentSubjectModal] =
+    useState(false);
+  const [showAddEvalCategoryModal, setShowAddEvalCategoryModal] =
+    useState(false);
+  const [showAddEvalQuestionModal, setShowAddEvalQuestionModal] =
+    useState(false);
 
-  // Mock evaluation data
-  const [evaluations, setEvaluations] = useState([
-    {
-      studentId: "STU-1001",
-      course: "IT221 - Information Management",
-      rating: 4.5,
-      feedback: "The instructor explains clearly.",
-    },
-    {
-      studentId: "STU-1002",
-      course: "IT223 - Web Systems and Technologies",
-      rating: 4.8,
-      feedback: "Very interactive and helpful lessons!",
-    },
-    {
-      studentId: "STU-1003",
-      course: "IT224 - System Integration",
-      rating: 4.0,
-      feedback: "Challenging but rewarding class.",
-    },
-  ]);
-
-  // Mock incident data
-  const [incidents, setIncidents] = useState([
-    {
-      id: 1,
-      studentId: "STU-1001",
-      subject: "Disruptive behavior",
-      description: "Student disrupted during class.",
-      status: "Pending",
-    },
-    {
-      id: 2,
-      studentId: "STU-1005",
-      subject: "Cheating",
-      description: "Possible cheating incident reported.",
-      status: "Under Investigation",
-    },
-  ]);
-
-  // Mock user data
+  // State for editing and assigning
+  const [editingEntity, setEditingEntity] = useState(null);
+  // const [assigningEntity, setAssigningEntity] = useState(null); // Placeholder for assignment modal
+  const [evaluations, setEvaluations] = useState([]);
+  const [incidents, setIncidents] = useState([]);
+  const [activityLogs, setActivityLogs] = useState([]);
   const [students, setStudents] = useState([]);
   const [faculty, setFaculty] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [sections, setSections] = useState([]);
   const [subjects, setSubjects] = useState([]);
+  const [facultyLoads, setFacultyLoads] = useState([]);
+  const [studentSubjects, setStudentSubjects] = useState([]);
+
+  // Pagination states
+  // (Assuming you will create a modal for adding/editing questions, similar to the others)
+  const [evaluationQuestions, setEvaluationQuestions] = useState([]);
 
   // Pagination states
   const [studentsPage, setStudentsPage] = useState(1);
   const [facultyPage, setFacultyPage] = useState(1);
   const [departmentsPage, setDepartmentsPage] = useState(1);
+  const [facultyLoadsPage, setFacultyLoadsPage] = useState(1);
+  const [studentSubjectsPage, setStudentSubjectsPage] = useState(1);
   const [sectionsPage, setSectionsPage] = useState(1);
   const [subjectsPage, setSubjectsPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
@@ -116,6 +128,16 @@ export default function AdminDashboard({ setUserRole }) {
     }
   };
 
+  // State for sorting
+  const [sortConfig, setSortConfig] = useState({
+    key: null,
+    direction: "ascending",
+  });
+  // State for filtering (example for students)
+  const [studentFilter, setStudentFilter] = useState({
+    department: "",
+    year: "",
+  });
   const fetchFaculty = async () => {
     try {
       const response = await axios.get(
@@ -154,17 +176,150 @@ export default function AdminDashboard({ setUserRole }) {
     }
   };
 
-  const handleAddStudent = () => fetchStudents();
-  const handleAddFaculty = () => fetchFaculty();
-  const handleAddDepartment = () => fetchDepartments();
-  const handleAddSection = () => fetchSections();
-  const handleAddSubject = () => fetchSubjects();
+  const fetchFacultyLoads = async () => {
+    try {
+      const response = await axios.get("http://localhost:3001/faculty-loads");
+      setFacultyLoads(response.data);
+    } catch (error) {
+      console.error("Error fetching faculty loads:", error);
+    }
+  };
 
+  const fetchStudentSubjects = async () => {
+    try {
+      const response = await axios.get(
+        "http://localhost:3001/student-subjects"
+      );
+      setStudentSubjects(response.data);
+    } catch (error) {
+      console.error("Error fetching student subjects:", error);
+    }
+  };
+
+  const fetchEvaluationQuestions = async () => {
+    try {
+      const response = await axios.get(
+        "http://localhost:3001/evaluation-questions"
+      );
+      setEvaluationQuestions(response.data);
+    } catch (error) {
+      console.error("Error fetching evaluation questions:", error);
+    }
+  };
+
+  const fetchAdminEvaluations = async () => {
+    try {
+      const response = await axios.get("http://localhost:3001/evaluations");
+      setEvaluations(response.data);
+    } catch (error) {
+      console.error("Error fetching evaluation reports:", error);
+    }
+  };
+
+  const fetchIncidents = async () => {
+    try {
+      const response = await axios.get("http://localhost:3001/incidents");
+      setIncidents(response.data);
+    } catch (error) {
+      console.error("Error fetching incidents:", error);
+    }
+  };
+
+  const fetchAdminActivityLogs = async () => {
+    try {
+      const response = await axios.get("http://localhost:3001/activity-logs");
+      setActivityLogs(response.data);
+    } catch (error) {
+      console.error("Error fetching admin activity logs:", error);
+    }
+  };
+  const requestSort = (key) => {
+    let direction = "ascending";
+    if (sortConfig.key === key && sortConfig.direction === "ascending") {
+      direction = "descending";
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIndicator = (key) => {
+    if (sortConfig.key !== key) return;
+    return sortConfig.direction === "ascending" ? " ▲" : " ▼";
+  };
+
+  // Unified success handler for modals
+  const handleSuccess = (type) => {
+    switch (type) {
+      case "student":
+        fetchStudents();
+        break;
+      case "faculty":
+        fetchFaculty();
+        break;
+      case "department":
+        fetchDepartments();
+        break;
+      case "section":
+        fetchSections();
+        break;
+      case "subject":
+        fetchSubjects();
+        break;
+      case "faculty-load":
+        fetchFacultyLoads();
+        break;
+      case "student-subject":
+        fetchStudentSubjects();
+        break;
+      case "evaluation-category":
+        fetchEvaluationQuestions(); // Refresh the whole list
+        break;
+      case "evaluation-question":
+        fetchEvaluationQuestions();
+        break;
+      case "evaluation-report":
+        fetchAdminEvaluations();
+        break;
+      case "activity-log":
+        fetchAdminActivityLogs();
+        break;
+      default:
+        break;
+    }
+    // Close any open modals
+    setEditingEntity(null);
+    setShowAddStudentModal(false);
+    setShowAddFacultyModal(false);
+    setShowAddDepartmentModal(false);
+    setShowAddSectionModal(false);
+    setShowAddSubjectModal(false);
+    setShowAssignLoadModal(false);
+    setShowAssignStudentSubjectModal(false);
+    setShowAddEvalCategoryModal(false);
+    setShowAddEvalQuestionModal(false);
+  };
+
+  const handleEdit = (type, entity) => {
+    setEditingEntity({ type, data: entity });
+  };
+
+  const handleAssignSubjects = (user, role) => {
+    if (role === "student") {
+      setShowAssignStudentSubjectModal(true);
+    } else if (role === "faculty") {
+      // This opens the general faculty load assignment.
+      // A more advanced version could pre-fill the faculty member.
+      setShowAssignLoadModal(true);
+    }
+  };
   const handleDelete = async (type, id) => {
     if (window.confirm(`Are you sure you want to delete this ${type}?`)) {
       try {
         if (type === "student" || type === "faculty") {
           await axios.delete(`http://localhost:3001/users/${id}`);
+        } else if (type === "faculty-load") {
+          await axios.delete(`http://localhost:3001/faculty-loads/${id}`);
+        } else if (type === "student-subject") {
+          await axios.delete(`http://localhost:3001/student-subjects/${id}`);
         } else {
           await axios.delete(`http://localhost:3001/${type}s/${id}`);
         }
@@ -191,6 +346,12 @@ export default function AdminDashboard({ setUserRole }) {
             fetchSubjects();
             fetchSections();
             break;
+          case "faculty-load":
+            fetchFacultyLoads();
+            break;
+          case "student-subject":
+            fetchStudentSubjects();
+            break;
           default:
             break;
         }
@@ -216,12 +377,26 @@ export default function AdminDashboard({ setUserRole }) {
     datasets: [],
   });
 
-  const handleStatusChange = (id, newStatus) => {
-    setIncidents((prev) =>
-      prev.map((incident) =>
-        incident.id === id ? { ...incident, status: newStatus } : incident
-      )
-    );
+  const handleStatusChange = async (id, newStatus) => {
+    try {
+      const response = await axios.patch(
+        `http://localhost:3001/incidents/${id}`,
+        {
+          status: newStatus,
+        }
+      );
+      alert(response.data.message);
+
+      if (newStatus === "Resolved") {
+        // Immediately remove the resolved incident from the view
+        setIncidents((prev) => prev.filter((incident) => incident.id !== id));
+      } else {
+        fetchIncidents(); // Re-fetch for other status changes
+      }
+    } catch (error) {
+      console.error("Error updating incident status:", error);
+      alert("Failed to update status. Please try again.");
+    }
   };
 
   const handleLogout = () => {
@@ -237,37 +412,162 @@ export default function AdminDashboard({ setUserRole }) {
   }, [activeSection]);
 
   useEffect(() => {
-    // Generate mock chart data when timeRange changes
-    const generateData = () => {
-      const labels = [];
-      const data = [];
-      for (let i = 0; i < timeRange; i++) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        labels.unshift(
-          date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    const fetchChartData = async () => {
+      try {
+        const response = await axios.get(
+          `http://localhost:3001/evaluations/stats/daily?days=${timeRange}`
         );
-        // Random number of evaluations for demo purposes
-        data.unshift(Math.floor(Math.random() * 50) + 10);
-      }
+        const dailyData = response.data;
 
-      setChartData({
-        labels,
-        datasets: [
-          {
-            label: "Daily Evaluations",
-            data,
-            backgroundColor: "rgba(0, 82, 163, 0.6)",
-            borderColor: "rgba(0, 82, 163, 1)",
-            borderWidth: 1,
-            borderRadius: 5,
-          },
-        ],
-      });
+        // Create a map of dates for the last `timeRange` days, initialized to 0
+        const dateMap = new Map();
+        for (let i = 0; i < timeRange; i++) {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          // Use a consistent date format (YYYY-MM-DD) for the key
+          const key = d.toISOString().split("T")[0];
+          dateMap.set(key, 0);
+        }
+
+        // Populate the map with data from the API
+        dailyData.forEach((item) => {
+          const dateKey = new Date(item.evaluation_date)
+            .toISOString()
+            .split("T")[0];
+          if (dateMap.has(dateKey)) {
+            dateMap.set(dateKey, item.evaluation_count);
+          }
+        });
+
+        // Sort the map by date and extract labels and data
+        const sortedData = new Map([...dateMap.entries()].sort());
+        const labels = [...sortedData.keys()].map((dateStr) =>
+          new Date(dateStr).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          })
+        );
+        const data = [...sortedData.values()];
+
+        setChartData({
+          labels,
+          datasets: [
+            {
+              label: "Daily Evaluations",
+              data,
+              backgroundColor: "rgba(0, 82, 163, 0.6)",
+              borderColor: "rgba(0, 82, 163, 1)",
+              borderWidth: 1,
+              borderRadius: 5,
+            },
+          ],
+        });
+      } catch (error) {
+        console.error("Error fetching chart data:", error);
+      }
     };
 
-    generateData();
+    fetchChartData();
   }, [timeRange]);
+
+  // Apply sorting logic to data before pagination
+  const sortedStudents = [...students].sort((a, b) => {
+    if (sortConfig.key) {
+      const aValue = a[sortConfig.key];
+      const bValue = b[sortConfig.key];
+      if (aValue < bValue) {
+        return sortConfig.direction === "ascending" ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return sortConfig.direction === "ascending" ? 1 : -1;
+      }
+    }
+    return 0;
+  });
+
+  const sortedFaculty = [...faculty].sort((a, b) => {
+    if (sortConfig.key) {
+      const aValue = a[sortConfig.key];
+      const bValue = b[sortConfig.key];
+      if (aValue < bValue) {
+        return sortConfig.direction === "ascending" ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return sortConfig.direction === "ascending" ? 1 : -1;
+      }
+    }
+    return 0;
+  });
+
+  const sortedDepartments = [...departments].sort((a, b) => {
+    if (sortConfig.key) {
+      const aValue = a[sortConfig.key];
+      const bValue = b[sortConfig.key];
+      if (aValue < bValue) {
+        return sortConfig.direction === "ascending" ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return sortConfig.direction === "ascending" ? 1 : -1;
+      }
+    }
+    return 0;
+  });
+
+  const sortedSections = [...sections].sort((a, b) => {
+    if (sortConfig.key) {
+      const aValue = a[sortConfig.key];
+      const bValue = b[sortConfig.key];
+      if (aValue < bValue) {
+        return sortConfig.direction === "ascending" ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return sortConfig.direction === "ascending" ? 1 : -1;
+      }
+    }
+    return 0;
+  });
+
+  const sortedSubjects = [...subjects].sort((a, b) => {
+    if (sortConfig.key) {
+      const aValue = a[sortConfig.key];
+      const bValue = b[sortConfig.key];
+      if (aValue < bValue) {
+        return sortConfig.direction === "ascending" ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return sortConfig.direction === "ascending" ? 1 : -1;
+      }
+    }
+    return 0;
+  });
+
+  const sortedFacultyLoads = [...facultyLoads].sort((a, b) => {
+    if (sortConfig.key) {
+      const aValue = a[sortConfig.key];
+      const bValue = b[sortConfig.key];
+      if (aValue < bValue) {
+        return sortConfig.direction === "ascending" ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return sortConfig.direction === "ascending" ? 1 : -1;
+      }
+    }
+    return 0;
+  });
+
+  const sortedStudentSubjects = [...studentSubjects].sort((a, b) => {
+    if (sortConfig.key) {
+      const aValue = a[sortConfig.key];
+      const bValue = b[sortConfig.key];
+      if (aValue < bValue) {
+        return sortConfig.direction === "ascending" ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return sortConfig.direction === "ascending" ? 1 : -1;
+      }
+    }
+    return 0;
+  });
 
   useEffect(() => {
     // Fetch all user management data when the component mounts
@@ -276,43 +576,77 @@ export default function AdminDashboard({ setUserRole }) {
     fetchFaculty();
     fetchSections();
     fetchSubjects();
+    fetchFacultyLoads();
+    fetchStudentSubjects();
+    fetchEvaluationQuestions();
+    fetchAdminEvaluations(); // Fetch evaluations on initial load
+    fetchIncidents(); // Fetch incidents on initial load
+    fetchAdminActivityLogs(); // Fetch all activity logs
   }, []);
 
   const chartOptions = {
     responsive: true,
     plugins: { legend: { display: false } },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: {
+          // This ensures that the y-axis ticks are only whole numbers.
+          precision: 0,
+          stepSize: 1,
+        },
+      },
+    },
   };
 
   // Pagination logic
-  const paginatedStudents = students.slice(
+  const paginatedStudents = sortedStudents.slice(
     (studentsPage - 1) * ITEMS_PER_PAGE,
     studentsPage * ITEMS_PER_PAGE
   );
-  const totalStudentPages = Math.ceil(students.length / ITEMS_PER_PAGE);
+  const totalStudentPages = Math.ceil(sortedStudents.length / ITEMS_PER_PAGE);
 
-  const paginatedFaculty = faculty.slice(
+  const paginatedFaculty = sortedFaculty.slice(
     (facultyPage - 1) * ITEMS_PER_PAGE,
     facultyPage * ITEMS_PER_PAGE
   );
-  const totalFacultyPages = Math.ceil(faculty.length / ITEMS_PER_PAGE);
+  const totalFacultyPages = Math.ceil(sortedFaculty.length / ITEMS_PER_PAGE);
 
-  const paginatedDepartments = departments.slice(
+  const paginatedDepartments = sortedDepartments.slice(
     (departmentsPage - 1) * ITEMS_PER_PAGE,
     departmentsPage * ITEMS_PER_PAGE
   );
-  const totalDepartmentPages = Math.ceil(departments.length / ITEMS_PER_PAGE);
+  const totalDepartmentPages = Math.ceil(
+    sortedDepartments.length / ITEMS_PER_PAGE
+  );
 
-  const paginatedSections = sections.slice(
+  const paginatedFacultyLoads = sortedFacultyLoads.slice(
+    (facultyLoadsPage - 1) * ITEMS_PER_PAGE,
+    facultyLoadsPage * ITEMS_PER_PAGE
+  );
+  const totalFacultyLoadsPages = Math.ceil(
+    sortedFacultyLoads.length / ITEMS_PER_PAGE
+  );
+
+  const paginatedStudentSubjects = sortedStudentSubjects.slice(
+    (studentSubjectsPage - 1) * ITEMS_PER_PAGE,
+    studentSubjectsPage * ITEMS_PER_PAGE
+  );
+  const totalStudentSubjectsPages = Math.ceil(
+    sortedStudentSubjects.length / ITEMS_PER_PAGE
+  );
+
+  const paginatedSections = sortedSections.slice(
     (sectionsPage - 1) * ITEMS_PER_PAGE,
     sectionsPage * ITEMS_PER_PAGE
   );
-  const totalSectionPages = Math.ceil(sections.length / ITEMS_PER_PAGE);
+  const totalSectionPages = Math.ceil(sortedSections.length / ITEMS_PER_PAGE);
 
-  const paginatedSubjects = subjects.slice(
+  const paginatedSubjects = sortedSubjects.slice(
     (subjectsPage - 1) * ITEMS_PER_PAGE,
     subjectsPage * ITEMS_PER_PAGE
   );
-  const totalSubjectPages = Math.ceil(subjects.length / ITEMS_PER_PAGE);
+  const totalSubjectPages = Math.ceil(sortedSubjects.length / ITEMS_PER_PAGE);
 
   return (
     <div className="admin-dashboard">
@@ -361,8 +695,8 @@ export default function AdminDashboard({ setUserRole }) {
             }`}
             onClick={() => setActiveSection("overview")}
           >
-            <FaTachometerAlt />
-            <span>Overview</span>
+            <FaChartBar />
+            <span>Analytics</span>
           </button>
 
           <button
@@ -403,6 +737,16 @@ export default function AdminDashboard({ setUserRole }) {
             <FaUsersCog />
             <span>User Management</span>
           </button>
+          <button
+            className={`sidebar-btn ${
+              activeSection === "evaluation-management" ? "active" : ""
+            }`}
+            onClick={() => setActiveSection("evaluation-management")}
+          >
+            <FaQuestionCircle />
+            <span>Evaluation Questions</span>
+          </button>
+
           <div className="sidebar-logo">
             <img src={evalinkLogo} alt="Evalink Logo" className="ustp-logo" />
           </div>
@@ -420,14 +764,12 @@ export default function AdminDashboard({ setUserRole }) {
                   <p>{evaluations.length}</p>
                 </div>
                 <div className="stat-card">
-                  <h4>Pending Incidents</h4>
-                  <p>
-                    {incidents.filter((i) => i.status === "Pending").length}
-                  </p>
+                  <h4>Total Students</h4>
+                  <p>{students.length}</p>
                 </div>
                 <div className="stat-card">
-                  <h4>Active Users</h4>
-                  <p>152</p> {/* Mock data */}
+                  <h4>Total Faculty</h4>
+                  <p>{faculty.length}</p>
                 </div>
               </div>
 
@@ -466,10 +808,10 @@ export default function AdminDashboard({ setUserRole }) {
               <h2>Evaluation Reports</h2>
               <div className="evaluations">
                 {evaluations.map((e, index) => (
-                  <div key={index} className="evaluation-card">
+                  <div key={e.id || index} className="evaluation-card">
                     <h3>{e.course}</h3>
                     <p>
-                      <strong>Student ID:</strong> {e.studentId}
+                      <strong>Student ID:</strong> {e.student_id}
                     </p>
                     <p>
                       <strong>Rating:</strong> ⭐ {e.rating}
@@ -500,26 +842,51 @@ export default function AdminDashboard({ setUserRole }) {
               <div className="incident-list">
                 {incidents.map((incident) => (
                   <div key={incident.id} className="incident-card">
-                    <h3>{incident.subject}</h3>
+                    <span
+                      className={`incident-card-status-label status-${incident.status
+                        .toLowerCase()
+                        .replace(" ", "-")}`}
+                    >
+                      {incident.status}
+                    </span>
+                    <h3>{incident.title}</h3>
                     <p>
-                      <strong>Student ID:</strong> {incident.studentId}
+                      <strong>Reported by:</strong> {incident.reporter_name} (
+                      {incident.reporter_id})
                     </p>
                     <p>
                       <strong>Description:</strong> {incident.description}
                     </p>
                     <p>
-                      <strong>Status:</strong>{" "}
-                      <select
-                        value={incident.status}
-                        onChange={(e) =>
-                          handleStatusChange(incident.id, e.target.value)
-                        }
-                      >
-                        <option>Pending</option>
-                        <option>Under Investigation</option>
-                        <option>Resolved</option>
-                      </select>
+                      <strong>Date:</strong> {incident.date}
                     </p>
+                    <div className="incident-status-actions">
+                      {STATUS_ORDER.map((status) => {
+                        const currentStatusIndex = STATUS_ORDER.indexOf(
+                          incident.status
+                        );
+                        const buttonStatusIndex = STATUS_ORDER.indexOf(status);
+
+                        return (
+                          <div key={status} className="status-btn-wrapper">
+                            <button
+                              className={`status-btn status-${status
+                                .toLowerCase()
+                                .replace(" ", "-")} ${
+                                incident.status === status ? "active" : ""
+                              }`}
+                              onClick={() =>
+                                handleStatusChange(incident.id, status)
+                              }
+                              disabled={buttonStatusIndex < currentStatusIndex}
+                            >
+                              {statusIcons[status]}
+                              <span>{status}</span>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -530,14 +897,37 @@ export default function AdminDashboard({ setUserRole }) {
           {activeSection === "activity" && (
             <section className="activity-log-section">
               <h2>Activity Log</h2>
-              <div className="activity-item">
-                <span className="activity-type">Admin Login</span>
-                <p>You accessed the admin panel successfully.</p>
-              </div>
-              <div className="activity-item">
-                <span className="activity-type">Report Review</span>
-                <p>Reviewed evaluation and updated report statuses.</p>
-              </div>
+              {activityLogs.length > 0 ? (
+                <div className="activity-log-container">
+                  {activityLogs.map((log, index) => (
+                    <div
+                      key={index}
+                      className={`activity-item ${log.activity_type}`}
+                    >
+                      <div className="activity-icon">
+                        {{
+                          login: <FaSignInAlt color="#28a745" />,
+                          logout: <FaSignOutAlt color="#dc3545" />,
+                          evaluation: <FaClipboardCheck color="#007bff" />,
+                          report_incident: (
+                            <FaExclamationTriangle color="#ffc107" />
+                          ),
+                          update_profile: <FaUserCircle color="#6c757d" />,
+                        }[log.activity_type] || <FaHistory color="#6c757d" />}
+                      </div>
+                      <div className="activity-details">
+                        <p>
+                          <strong>{log.user_name}</strong> ({log.user_role}){" "}
+                          {log.description}
+                        </p>
+                        <span className="activity-time">{log.timestamp}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p>No activity has been logged yet.</p>
+              )}
             </section>
           )}
 
@@ -545,22 +935,65 @@ export default function AdminDashboard({ setUserRole }) {
           {activeSection === "user-management" && (
             <section className="user-management-section">
               <h2>User Management</h2>
-              <div className="user-management-actions">
-                <button onClick={() => setShowAddStudentModal(true)}>
-                  Add Student
-                </button>
-                <button onClick={() => setShowAddFacultyModal(true)}>
-                  Add Faculty
-                </button>
-                <button onClick={() => setShowAddDepartmentModal(true)}>
-                  Add Department
-                </button>
-                <button onClick={() => setShowAddSectionModal(true)}>
-                  Add Section
-                </button>
-                <button onClick={() => setShowAddSubjectModal(true)}>
-                  Add Subject
-                </button>
+              <div className="actions-grid">
+                <div className="actions-group">
+                  <h4>Users</h4>
+                  <button
+                    className="action-item-btn"
+                    onClick={() => setShowAddStudentModal(true)}
+                  >
+                    <FaUserPlus />
+                    <span>Add Student</span>
+                  </button>
+                  <button
+                    className="action-item-btn"
+                    onClick={() => setShowAddFacultyModal(true)}
+                  >
+                    <FaChalkboardTeacher />
+                    <span>Add Faculty</span>
+                  </button>
+                </div>
+                <div className="actions-group">
+                  <h4>Academics</h4>
+                  <button
+                    className="action-item-btn"
+                    onClick={() => setShowAddDepartmentModal(true)}
+                  >
+                    <FaBuilding />
+                    <span>Add Department</span>
+                  </button>
+                  <button
+                    className="action-item-btn"
+                    onClick={() => setShowAddSectionModal(true)}
+                  >
+                    <FaUsers />
+                    <span>Add Section</span>
+                  </button>
+                  <button
+                    className="action-item-btn"
+                    onClick={() => setShowAddSubjectModal(true)}
+                  >
+                    <FaBookOpen />
+                    <span>Add Subject</span>
+                  </button>
+                </div>
+                <div className="actions-group">
+                  <h4>Assignments</h4>
+                  <button
+                    className="action-item-btn"
+                    onClick={() => setShowAssignLoadModal(true)}
+                  >
+                    <FaClipboardList />
+                    <span>Assign Faculty Load</span>
+                  </button>
+                  <button
+                    className="action-item-btn"
+                    onClick={() => setShowAssignStudentSubjectModal(true)}
+                  >
+                    <FaUserGraduate />
+                    <span>Assign Subject to Student</span>
+                  </button>
+                </div>
               </div>
 
               <div className="user-table-container">
@@ -568,11 +1001,19 @@ export default function AdminDashboard({ setUserRole }) {
                 <table>
                   <thead>
                     <tr>
-                      <th>Student ID</th>
-                      <th>Name</th>
-                      <th>Year Level</th>
-                      <th>Department</th>
-                      <th>Actions</th>
+                      <th onClick={() => requestSort("id")}>
+                        Student ID{getSortIndicator("id")}
+                      </th>
+                      <th onClick={() => requestSort("name")}>
+                        Name{getSortIndicator("name")}
+                      </th>
+                      <th onClick={() => requestSort("year")}>
+                        Year Level{getSortIndicator("year")}
+                      </th>
+                      <th onClick={() => requestSort("department_name")}>
+                        Department{getSortIndicator("department_name")}
+                      </th>
+                      <th className="actions-column">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -580,9 +1021,23 @@ export default function AdminDashboard({ setUserRole }) {
                       <tr key={student.id}>
                         <td>{student.id}</td>
                         <td>{student.name}</td>
-                        <td>{student.year}</td>
-                        <td>{student.department}</td>
+                        <td>{student.year_level}</td>
+                        <td>{student.department_name || "N/A"}</td>
                         <td>
+                          <button
+                            className="action-btn edit-btn"
+                            onClick={() => handleEdit("student", student)}
+                          >
+                            <FaEdit />
+                          </button>
+                          <button
+                            className="action-btn assign-btn"
+                            onClick={() =>
+                              handleAssignSubjects(student, "student")
+                            }
+                          >
+                            <FaBook />
+                          </button>
                           <button
                             className="action-btn delete-btn"
                             onClick={() => handleDelete("student", student.id)}
@@ -624,10 +1079,16 @@ export default function AdminDashboard({ setUserRole }) {
                 <table>
                   <thead>
                     <tr>
-                      <th>Faculty ID</th>
-                      <th>Name</th>
-                      <th>Department</th>
-                      <th>Actions</th>
+                      <th onClick={() => requestSort("id")}>
+                        Faculty ID{getSortIndicator("id")}
+                      </th>
+                      <th onClick={() => requestSort("name")}>
+                        Name{getSortIndicator("name")}
+                      </th>
+                      <th onClick={() => requestSort("department_name")}>
+                        Department{getSortIndicator("department_name")}
+                      </th>
+                      <th className="actions-column">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -635,8 +1096,20 @@ export default function AdminDashboard({ setUserRole }) {
                       <tr key={fac.id}>
                         <td>{fac.id}</td>
                         <td>{fac.name}</td>
-                        <td>{fac.department}</td>
+                        <td>{fac.department_name || "N/A"}</td>
                         <td>
+                          <button
+                            className="action-btn edit-btn"
+                            onClick={() => handleEdit("faculty", fac)}
+                          >
+                            <FaEdit />
+                          </button>
+                          <button
+                            className="action-btn assign-btn"
+                            onClick={() => handleAssignSubjects(fac, "faculty")}
+                          >
+                            <FaBook />
+                          </button>
                           <button
                             className="action-btn delete-btn"
                             onClick={() => handleDelete("faculty", fac.id)}
@@ -678,9 +1151,13 @@ export default function AdminDashboard({ setUserRole }) {
                 <table>
                   <thead>
                     <tr>
-                      <th>Department ID</th>
-                      <th>Name</th>
-                      <th>Actions</th>
+                      <th onClick={() => requestSort("id")}>
+                        Department ID{getSortIndicator("id")}
+                      </th>
+                      <th onClick={() => requestSort("name")}>
+                        Name{getSortIndicator("name")}
+                      </th>
+                      <th className="actions-column">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -689,6 +1166,12 @@ export default function AdminDashboard({ setUserRole }) {
                         <td>{dept.id}</td>
                         <td>{dept.name}</td>
                         <td>
+                          <button
+                            className="action-btn edit-btn"
+                            onClick={() => handleEdit("department", dept)}
+                          >
+                            <FaEdit />
+                          </button>
                           <button
                             className="action-btn delete-btn"
                             onClick={() => handleDelete("department", dept.id)}
@@ -728,14 +1211,158 @@ export default function AdminDashboard({ setUserRole }) {
               </div>
 
               <div className="user-table-container">
+                <h3>Faculty Teaching Loads</h3>
+                <table>
+                  <thead>
+                    <tr>
+                      <th onClick={() => requestSort("faculty_name")}>
+                        Faculty Name{getSortIndicator("faculty_name")}
+                      </th>
+                      <th onClick={() => requestSort("subject_name")}>
+                        Subject{getSortIndicator("subject_name")}
+                      </th>
+                      <th onClick={() => requestSort("section_name")}>
+                        Section{getSortIndicator("section_name")}
+                      </th>
+                      <th onClick={() => requestSort("department_name")}>
+                        Department{getSortIndicator("department_name")}
+                      </th>
+                      <th className="actions-column">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedFacultyLoads.map((load) => (
+                      <tr key={load.id}>
+                        <td>{load.faculty_name}</td>
+                        <td>{load.subject_name}</td>
+                        <td>{load.section_name}</td>
+                        <td>{load.department_name}</td>
+                        <td>
+                          <button
+                            className="action-btn delete-btn"
+                            onClick={() =>
+                              handleDelete("faculty-load", load.id)
+                            }
+                          >
+                            <FaTrash />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {totalFacultyLoadsPages > 1 && (
+                  <div className="pagination-controls">
+                    <button
+                      onClick={() =>
+                        setFacultyLoadsPage((p) => Math.max(p - 1, 1))
+                      }
+                      disabled={facultyLoadsPage === 1}
+                    >
+                      Previous
+                    </button>
+                    <span>
+                      Page {facultyLoadsPage} of {totalFacultyLoadsPages}
+                    </span>
+                    <button
+                      onClick={() =>
+                        setFacultyLoadsPage((p) =>
+                          Math.min(p + 1, totalFacultyLoadsPages)
+                        )
+                      }
+                      disabled={facultyLoadsPage === totalFacultyLoadsPages}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="user-table-container">
+                <h3>Student Enrollments</h3>
+                <table>
+                  <thead>
+                    <tr>
+                      <th onClick={() => requestSort("student_name")}>
+                        Student Name{getSortIndicator("student_name")}
+                      </th>
+                      <th onClick={() => requestSort("subject_name")}>
+                        Subject{getSortIndicator("subject_name")}
+                      </th>
+                      <th onClick={() => requestSort("faculty_name")}>
+                        Faculty{getSortIndicator("faculty_name")}
+                      </th>
+                      <th onClick={() => requestSort("section_name")}>
+                        Section{getSortIndicator("section_name")}
+                      </th>
+                      <th className="actions-column">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedStudentSubjects.map((enrollment) => (
+                      <tr key={enrollment.id}>
+                        <td>{enrollment.student_name}</td>
+                        <td>{enrollment.subject_name}</td>
+                        <td>{enrollment.faculty_name}</td>
+                        <td>{enrollment.section_name || "N/A (Irregular)"}</td>
+                        <td>
+                          <button
+                            className="action-btn delete-btn"
+                            onClick={() =>
+                              handleDelete("student-subject", enrollment.id)
+                            }
+                          >
+                            <FaTrash />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {totalStudentSubjectsPages > 1 && (
+                  <div className="pagination-controls">
+                    <button
+                      onClick={() =>
+                        setStudentSubjectsPage((p) => Math.max(p - 1, 1))
+                      }
+                      disabled={studentSubjectsPage === 1}
+                    >
+                      Previous
+                    </button>
+                    <span>
+                      Page {studentSubjectsPage} of {totalStudentSubjectsPages}
+                    </span>
+                    <button
+                      onClick={() =>
+                        setStudentSubjectsPage((p) =>
+                          Math.min(p + 1, totalStudentSubjectsPages)
+                        )
+                      }
+                      disabled={
+                        studentSubjectsPage === totalStudentSubjectsPages
+                      }
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="user-table-container">
                 <h3>Sections</h3>
                 <table>
                   <thead>
                     <tr>
-                      <th>Section ID</th>
-                      <th>Section Name</th>
-                      <th>Department</th>
-                      <th>Actions</th>
+                      <th onClick={() => requestSort("id")}>
+                        Section ID{getSortIndicator("id")}
+                      </th>
+                      <th onClick={() => requestSort("name")}>
+                        Section Name{getSortIndicator("name")}
+                      </th>
+                      <th onClick={() => requestSort("department_name")}>
+                        Department{getSortIndicator("department_name")}
+                      </th>
+                      <th className="actions-column">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -745,6 +1372,12 @@ export default function AdminDashboard({ setUserRole }) {
                         <td>{section.name}</td>
                         <td>{section.department_name || "N/A"}</td>
                         <td>
+                          <button
+                            className="action-btn edit-btn"
+                            onClick={() => handleEdit("section", section)}
+                          >
+                            <FaEdit />
+                          </button>
                           <button
                             className="action-btn delete-btn"
                             onClick={() => handleDelete("section", section.id)}
@@ -786,12 +1419,22 @@ export default function AdminDashboard({ setUserRole }) {
                 <table>
                   <thead>
                     <tr>
-                      <th>Subject Code</th>
-                      <th>Subject Name</th>
-                      <th>Year Level</th>
-                      <th>Assigned Faculty</th>
-                      <th>Department</th>
-                      <th>Actions</th>
+                      <th onClick={() => requestSort("code")}>
+                        Subject Code{getSortIndicator("code")}
+                      </th>
+                      <th onClick={() => requestSort("name")}>
+                        Subject Name{getSortIndicator("name")}
+                      </th>
+                      <th onClick={() => requestSort("year_level")}>
+                        Year Level{getSortIndicator("year_level")}
+                      </th>
+                      <th onClick={() => requestSort("faculty_name")}>
+                        Assigned Faculty{getSortIndicator("faculty_name")}
+                      </th>
+                      <th onClick={() => requestSort("department_name")}>
+                        Department{getSortIndicator("department_name")}
+                      </th>
+                      <th className="actions-column">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -803,6 +1446,12 @@ export default function AdminDashboard({ setUserRole }) {
                         <td>{subject.faculty_name || "N/A"}</td>
                         <td>{subject.department_name || "N/A"}</td>
                         <td>
+                          <button
+                            className="action-btn edit-btn"
+                            onClick={() => handleEdit("subject", subject)}
+                          >
+                            <FaEdit />
+                          </button>
                           <button
                             className="action-btn delete-btn"
                             onClick={() => handleDelete("subject", subject.id)}
@@ -840,41 +1489,184 @@ export default function AdminDashboard({ setUserRole }) {
               </div>
             </section>
           )}
+
+          {/* ===== EVALUATION MANAGEMENT ===== */}
+          {activeSection === "evaluation-management" && (
+            <section className="user-management-section">
+              {" "}
+              {/* Reusing styles */}
+              <h2>Manage Evaluation Questions</h2>
+              <div className="actions-grid">
+                <div className="actions-group">
+                  <h4>Actions</h4>
+                  <button
+                    className="action-item-btn"
+                    onClick={() => setShowAddEvalCategoryModal(true)}
+                  >
+                    <FaPlus /> <span>Add Category</span>
+                  </button>
+                  <button
+                    className="action-item-btn"
+                    onClick={() => setShowAddEvalQuestionModal(true)}
+                  >
+                    <FaPlus /> <span>Add Question</span>
+                  </button>
+                </div>
+              </div>
+              {Array.isArray(evaluationQuestions) &&
+                evaluationQuestions.map((category, index) => (
+                  <div
+                    key={category.id || index}
+                    className="user-table-container"
+                  >
+                    <h3>
+                      {category.name}
+                      <button
+                        className="action-btn edit-btn"
+                        style={{ marginLeft: "1rem" }}
+                        onClick={() =>
+                          alert(`Editing category ${category.name || ""}`)
+                        }
+                      >
+                        <FaEdit />
+                      </button>
+                      <button
+                        className="action-btn delete-btn"
+                        onClick={() =>
+                          alert(`Deleting category ${category.name || ""}`)
+                        }
+                      >
+                        <FaTrash />
+                      </button>
+                    </h3>
+                    <ul>
+                      {/* Ensure questions is an array before mapping */}
+                      {Array.isArray(category.questions) &&
+                        category.questions.map((q) => (
+                          <li key={q.id}>
+                            {q.text || "Invalid question text"}
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                ))}
+            </section>
+          )}
         </main>
       </div>
       {showAddStudentModal && (
         <AddStudentModal
           onClose={() => setShowAddStudentModal(false)}
-          onAddStudent={handleAddStudent}
+          onSuccess={() => handleSuccess("student")}
           departments={departments}
+          sections={sections}
         />
       )}
       {showAddFacultyModal && (
         <AddFacultyModal
           onClose={() => setShowAddFacultyModal(false)}
-          onAddFaculty={handleAddFaculty}
+          onSuccess={() => handleSuccess("faculty")}
           departments={departments}
         />
       )}
       {showAddDepartmentModal && (
         <AddDepartmentModal
           onClose={() => setShowAddDepartmentModal(false)}
-          onAddDepartment={handleAddDepartment}
+          onSuccess={() => handleSuccess("department")}
         />
       )}
       {showAddSectionModal && (
         <AddSectionModal
           onClose={() => setShowAddSectionModal(false)}
-          onAddSection={handleAddSection}
+          onSuccess={() => handleSuccess("section")}
           departments={departments}
         />
       )}
       {showAddSubjectModal && (
         <AddSubjectModal
           onClose={() => setShowAddSubjectModal(false)}
-          onAddSubject={handleAddSubject}
+          onSuccess={() => handleSuccess("subject")}
+          departments={departments}
+        />
+      )}
+      {showAssignLoadModal && (
+        <AssignLoadModal
+          onClose={() => setShowAssignLoadModal(false)}
+          onSuccess={() => handleSuccess("faculty-load")}
+          faculty={faculty}
+          subjects={subjects}
+          sections={sections}
+        />
+      )}
+      {showAssignStudentSubjectModal && (
+        <AssignStudentSubjectModal
+          onClose={() => setShowAssignStudentSubjectModal(false)}
+          onSuccess={() => handleSuccess("student-subject")}
+          students={students}
+          subjects={subjects}
+          faculty={faculty}
+          facultyLoads={facultyLoads}
+          sections={sections}
+        />
+      )}
+      {showAddEvalCategoryModal && (
+        <AddEvalCategoryModal
+          onClose={() => setShowAddEvalCategoryModal(false)}
+          onSuccess={() => handleSuccess("evaluation-category")}
+        />
+      )}
+      {showAddEvalQuestionModal && (
+        <AddEvalQuestionModal
+          onClose={() => setShowAddEvalQuestionModal(false)}
+          onSuccess={() => handleSuccess("evaluation-question")}
+          categories={
+            Array.isArray(evaluationQuestions)
+              ? evaluationQuestions.map(({ id, name }) => ({ id, name }))
+              : []
+          }
+        />
+      )}
+
+      {/* Edit Modals: These reuse the "Add" modals but will be passed initial data */}
+      {editingEntity?.type === "student" && (
+        <AddStudentModal
+          onClose={() => setEditingEntity(null)}
+          onSuccess={() => handleSuccess("student")}
+          departments={departments}
+          sections={sections}
+          initialData={editingEntity.data}
+        />
+      )}
+      {editingEntity?.type === "faculty" && (
+        <AddFacultyModal
+          onClose={() => setEditingEntity(null)}
+          onSuccess={() => handleSuccess("faculty")}
+          departments={departments}
+          initialData={editingEntity.data}
+        />
+      )}
+      {editingEntity?.type === "department" && (
+        <AddDepartmentModal
+          onClose={() => setEditingEntity(null)}
+          onSuccess={() => handleSuccess("department")}
+          initialData={editingEntity.data}
+        />
+      )}
+      {editingEntity?.type === "section" && (
+        <AddSectionModal
+          onClose={() => setEditingEntity(null)}
+          onSuccess={() => handleSuccess("section")}
+          departments={departments}
+          initialData={editingEntity.data}
+        />
+      )}
+      {editingEntity?.type === "subject" && (
+        <AddSubjectModal
+          onClose={() => setEditingEntity(null)}
+          onSuccess={() => handleSuccess("subject")}
           departments={departments}
           faculty={faculty}
+          initialData={editingEntity.data}
         />
       )}
     </div>

@@ -77,6 +77,12 @@
   box-shadow: 0 0 0 3px rgba(0, 82, 163, 0.2);
 }
 
+.readonly-input {
+  background-color: #f3f4f6;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
 .modal-buttons {
   display: flex;
   justify-content: flex-end;

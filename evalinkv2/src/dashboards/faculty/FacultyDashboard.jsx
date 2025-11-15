@@ -7,8 +7,14 @@ import {
   FaUserCircle,
   FaTachometerAlt, // For Overview
   FaUsers, // For My Sections (or FaChalkboardTeacher)
+  FaBook, // For subjects
   FaClipboardList, // For Student Evaluations
   FaHistory, // For Activity Log
+  FaExclamationTriangle, // For Report Incident
+  FaSignInAlt, // For Login activity
+  FaSignOutAlt, // For Logout activity
+  FaClipboardCheck, // For Evaluation
+  FaCamera, // For upload button
 } from "react-icons/fa";
 
 export default function FacultyDashboard({ setUserRole }) {
@@ -16,35 +22,107 @@ export default function FacultyDashboard({ setUserRole }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showDropdown, setShowDropdown] = useState(false);
   const [sections, setSections] = useState([]);
+  const [incidentReports, setIncidentReports] = useState([]);
+  const [activityLogs, setActivityLogs] = useState([]);
+  const [evaluationResults, setEvaluationResults] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [groupedSubjects, setGroupedSubjects] = useState({});
+  const [faculty, setFaculty] = useState(null);
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    // You can add faculty-specific activity logging here if needed
-    // For example:
-    // const logs = JSON.parse(localStorage.getItem("facultyActivityLog")) || [];
-    // logs.push({ type: "logout", timestamp: new Date().toLocaleString() });
-    // localStorage.setItem("facultyActivityLog", JSON.stringify(logs));
-
-    if (setUserRole) {
-      setUserRole("");
+  const handleLogout = async () => {
+    const facultyId = localStorage.getItem("userId");
+    try {
+      // Log the logout event to the database
+      await axios.post("http://localhost:3001/activity-logs", {
+        userId: facultyId,
+        activityType: "logout",
+        description: "User logged out.",
+      });
+    } catch (error) {
+      console.error("Failed to log logout activity:", error);
+    } finally {
+      // Proceed with logout regardless of whether logging was successful
+      if (setUserRole) setUserRole("");
+      localStorage.removeItem("userId");
+      navigate("/login");
     }
-    localStorage.removeItem("userId"); // Clear stored user ID on logout
-    navigate("/login");
+  };
+
+  const fetchActivityLogs = () => {
+    const facultyId = localStorage.getItem("userId");
+    if (facultyId) {
+      axios
+        .get(`http://localhost:3001/users/${facultyId}/activity-logs`)
+        .then((response) => {
+          setActivityLogs(response.data);
+        })
+        .catch((error) =>
+          console.error("Error fetching activity logs:", error)
+        );
+    }
+  };
+
+  const fetchAllData = () => {
+    const facultyId = localStorage.getItem("userId");
+    if (!facultyId) {
+      navigate("/login");
+      return;
+    }
+
+    // Fetch faculty details
+    axios
+      .get(`http://localhost:3001/users/${facultyId}`)
+      .then((response) => setFaculty(response.data))
+      .catch((err) => console.error("Failed to fetch faculty details:", err));
+
+    // Fetch sections and group them
+    axios
+      .get(`http://localhost:3001/users/${facultyId}/sections`)
+      .then((response) => {
+        const data = response.data;
+        setSections(data);
+        const grouped = data.reduce((acc, item) => {
+          const { subject_id, subject_name, subject_code, section_name } = item;
+          if (!acc[subject_id]) {
+            acc[subject_id] = { subject_name, subject_code, sections: [] };
+          }
+          acc[subject_id].sections.push(section_name);
+          return acc;
+        }, {});
+        setGroupedSubjects(grouped);
+      })
+      .catch((err) => console.error("Error fetching sections:", err));
+
+    // Fetch evaluation results
+    axios
+      .get(`http://localhost:3001/faculty/${facultyId}/evaluations`)
+      .then((response) => setEvaluationResults(response.data))
+      .catch((err) => console.error("Error fetching evaluation results:", err));
+
+    // Fetch incident reports
+    axios
+      .get(`http://localhost:3001/incidents/student/${facultyId}`)
+      .then((response) => setIncidentReports(response.data))
+      .catch((err) => console.error("Error fetching incident reports:", err));
   };
 
   useEffect(() => {
-    if (activeSection === "sections") {
-      const facultyId = localStorage.getItem("userId");
-      if (facultyId) {
-        axios
-          .get(`http://localhost:3001/users/${facultyId}/sections`)
-          .then((response) => {
-            setSections(response.data);
-          })
-          .catch((error) => console.error("Error fetching sections:", error));
-      }
+    const facultyId = localStorage.getItem("userId");
+    if (!facultyId) {
+      navigate("/login");
+      return;
     }
-  }, [activeSection]);
+
+    // Fetch all data on initial load
+    fetchAllData();
+
+    // Specific fetches for tab changes if needed (e.g., activity log)
+    if (activeSection === "activity") {
+      fetchActivityLogs();
+    }
+  }, [activeSection, navigate]); // `activeSection` dependency re-fetches logs when tab changes
 
   return (
     <div className="faculty-dashboard">
@@ -71,7 +149,15 @@ export default function FacultyDashboard({ setUserRole }) {
               className="profile-icon"
               onClick={() => setShowDropdown(!showDropdown)}
             >
-              <FaUserCircle size={28} />
+              {faculty && faculty.profile_image_url ? (
+                <img
+                  src={`http://localhost:3001${faculty.profile_image_url}`}
+                  alt="Profile"
+                  className="header-profile-picture"
+                />
+              ) : (
+                <FaUserCircle size={28} />
+              )}
             </button>
 
             {showDropdown && (
@@ -122,6 +208,16 @@ export default function FacultyDashboard({ setUserRole }) {
 
           <button
             className={`sidebar-btn ${
+              activeSection === "report" ? "active" : ""
+            }`}
+            onClick={() => setActiveSection("report")}
+          >
+            <FaExclamationTriangle />
+            <span>Report Incident</span>
+          </button>
+
+          <button
+            className={`sidebar-btn ${
               activeSection === "activity" ? "active" : ""
             }`}
             onClick={() => setActiveSection("activity")}
@@ -139,12 +235,45 @@ export default function FacultyDashboard({ setUserRole }) {
           {/* ===== OVERVIEW ===== */}
           {activeSection === "overview" && (
             <section className="overview-section">
-              <h2>Overview</h2>
-              <p>
-                Welcome, Professor! Here you can view the evaluations made by
-                your students, monitor their feedback, and review your handled
-                sections.
-              </p>
+              <h2>Dashboard Overview</h2>
+              <div className="overview-grid">
+                <div
+                  className="stat-card-faculty"
+                  onClick={() => setActiveSection("sections")}
+                >
+                  <div className="stat-card-faculty-icon">
+                    <FaBook />
+                  </div>
+                  <div className="stat-card-faculty-info">
+                    <h4>Subjects Handled</h4>
+                    <p>{Object.keys(groupedSubjects).length}</p>
+                  </div>
+                </div>
+                <div
+                  className="stat-card-faculty"
+                  onClick={() => setActiveSection("evaluations")}
+                >
+                  <div className="stat-card-faculty-icon">
+                    <FaClipboardCheck />
+                  </div>
+                  <div className="stat-card-faculty-info">
+                    <h4>Evaluations Received</h4>
+                    <p>{evaluationResults.length}</p>
+                  </div>
+                </div>
+                <div
+                  className="stat-card-faculty"
+                  onClick={() => setActiveSection("report")}
+                >
+                  <div className="stat-card-faculty-icon">
+                    <FaExclamationTriangle />
+                  </div>
+                  <div className="stat-card-faculty-info">
+                    <h4>My Reports</h4>
+                    <p>{incidentReports.length}</p>
+                  </div>
+                </div>
+              </div>
             </section>
           )}
 
@@ -152,12 +281,24 @@ export default function FacultyDashboard({ setUserRole }) {
           {activeSection === "sections" && (
             <section className="subjects-section">
               <h2>My Sections</h2>
-              {sections.length > 0 ? (
+              {isLoading ? (
+                <p>Loading...</p>
+              ) : error ? (
+                <p className="error-message">{error}</p>
+              ) : Object.keys(groupedSubjects).length > 0 ? (
                 <div className="subjects">
-                  {sections.map((section) => (
-                    <div key={section.id} className="subject-card">
-                      <h3>{section.name}</h3>
-                      <p>Subject: {section.subject_name}</p>
+                  {Object.entries(groupedSubjects).map(([subjectId, data]) => (
+                    <div key={subjectId} className="subject-card">
+                      <h3>{data.subject_name}</h3>
+                      <p className="subject-code">{data.subject_code}</p>
+                      <div className="section-list">
+                        <h4>Sections Handled:</h4>
+                        <ul>
+                          {data.sections.map((sectionName, index) => (
+                            <li key={index}>{sectionName}</li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -171,30 +312,125 @@ export default function FacultyDashboard({ setUserRole }) {
           {activeSection === "evaluations" && (
             <section className="evaluation-section">
               <h2>Student Evaluations</h2>
-              <div className="evaluation-list">
-                <div className="evaluation-card">
-                  <h3>IT223 - Web Systems and Technologies</h3>
-                  <p>
-                    Average Rating: <strong>4.6 / 5</strong>
-                  </p>
-                  <p>Remarks: "The lessons are clear and well explained!"</p>
+              {isLoading ? (
+                <p>Loading evaluation results...</p>
+              ) : error ? (
+                <p className="error-message">{error}</p>
+              ) : evaluationResults.length > 0 ? (
+                <div className="evaluation-list">
+                  {evaluationResults.map((result) => (
+                    <div key={result.subject_id} className="evaluation-card">
+                      <h3>
+                        {result.subject_name} ({result.subject_code})
+                      </h3>
+                      <div className="evaluation-summary">
+                        <p>
+                          Overall Average:{" "}
+                          <strong>{result.overall_average} / 5.00</strong>
+                        </p>
+                        <p>
+                          Total Respondents:{" "}
+                          <strong>{result.total_evaluations}</strong>
+                        </p>
+                      </div>
+                      {result.comments.length > 0 && (
+                        <div className="comments-section">
+                          <h4>Student Comments:</h4>
+                          <ul>
+                            {result.comments.map((comment, index) => (
+                              <li key={index}>"{comment}"</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
+              ) : (
+                <p>No evaluation results found for your subjects yet.</p>
+              )}
+            </section>
+          )}
 
-                <div className="evaluation-card">
-                  <h3>IT224 - System Integration and Architecture</h3>
-                  <p>
-                    Average Rating: <strong>4.8 / 5</strong>
-                  </p>
-                  <p>Remarks: "Engaging and helpful discussions!"</p>
-                </div>
+          {/* ===== INCIDENT REPORT ===== */}
+          {activeSection === "report" && (
+            <section className="incident-section">
+              <h2>Report an Incident</h2>
+              <form
+                className="incident-form"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.target);
+                  const report = {
+                    student_id: localStorage.getItem("userId"), // The reporter is the faculty
+                    title: formData.get("title"),
+                    description: formData.get("description"),
+                  };
+                  try {
+                    const response = await axios.post(
+                      "http://localhost:3001/incidents",
+                      report
+                    );
+                    alert(response.data.message);
+                    // Re-fetch incidents after successful submission
+                    const facultyId = localStorage.getItem("userId");
+                    const incidentsResponse = await axios.get(
+                      `http://localhost:3001/incidents/student/${facultyId}`
+                    );
+                    fetchActivityLogs(); // Refresh logs after reporting
+                    setIncidentReports(incidentsResponse.data);
+                    e.target.reset();
+                  } catch (error) {
+                    console.error("Error submitting incident:", error);
+                    alert(
+                      error.response?.data?.error ||
+                        "Failed to submit incident."
+                    );
+                  }
+                }}
+              >
+                <label>Title</label>
+                <input
+                  name="title"
+                  required
+                  placeholder="e.g., Cheating in IT223 Exam"
+                />
+                <label>Description</label>
+                <textarea
+                  name="description"
+                  required
+                  placeholder="Describe the incident in detail, including student names if applicable."
+                />
+                <button type="submit" className="submit-incident-btn">
+                  Submit Report
+                </button>
+              </form>
 
-                <div className="evaluation-card">
-                  <h3>IT221 - Information Management</h3>
-                  <p>
-                    Average Rating: <strong>4.4 / 5</strong>
+              <div className="incident-history">
+                <h4>Your Report History</h4>
+                {isLoading ? (
+                  <p>Loading history...</p>
+                ) : error ? (
+                  <p className="error-message">{error}</p>
+                ) : incidentReports.length > 0 ? (
+                  incidentReports.map((r) => (
+                    <div key={r.id} className="incident-item">
+                      <span
+                        className={`incident-item-status-label status-${r.status
+                          .toLowerCase()
+                          .replace(" ", "-")}`}
+                      >
+                        {r.status}
+                      </span>
+                      <strong>{r.title}</strong> <em>{r.date}</em>
+                      <p>{r.description}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="no-activity">
+                    You have not submitted any reports yet.
                   </p>
-                  <p>Remarks: "Challenging but rewarding subject."</p>
-                </div>
+                )}
               </div>
             </section>
           )}
@@ -203,37 +439,108 @@ export default function FacultyDashboard({ setUserRole }) {
           {activeSection === "activity" && (
             <section className="activity-log-section">
               <h2>Activity Log</h2>
-              <div className="activity-item login">
-                <span className="activity-type">Login</span>
-                <p>You logged into the faculty dashboard.</p>
-              </div>
-              <div className="activity-item view">
-                <span className="activity-type">Viewed Evaluations</span>
-                <p>You reviewed evaluation feedback for IT223.</p>
-              </div>
-              <div className="activity-item logout">
-                <span className="activity-type">Logout</span>
-                <p>You logged out of the system.</p>
-              </div>
+              {isLoading ? (
+                <p>Loading activity...</p>
+              ) : error ? (
+                <p className="error-message">{error}</p>
+              ) : activityLogs.length > 0 ? (
+                <div className="activity-log-container">
+                  {activityLogs.map((log, index) => (
+                    <div
+                      key={index}
+                      className={`activity-item ${log.activity_type}`}
+                    >
+                      <div className="activity-icon">
+                        {{
+                          login: <FaSignInAlt color="#28a745" />,
+                          logout: <FaSignOutAlt color="#dc3545" />,
+                          report_incident: (
+                            <FaExclamationTriangle color="#ffc107" />
+                          ),
+                          update_profile: <FaUserCircle color="#6c757d" />,
+                        }[log.activity_type] || <FaHistory color="#6c757d" />}
+                      </div>
+                      <div className="activity-details">
+                        <span className="activity-type">{log.description}</span>
+                        <span className="activity-time">{log.timestamp}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="no-activity">No activity logged yet.</p>
+              )}
             </section>
           )}
           {activeSection === "profile" && (
             <section className="profile-section-content">
-              <h2 className="profile-greeting">Hi, Professor!</h2>
-              <div className="profile-card-new">
-                <div className="profile-icon-new">
-                  <FaUserCircle size={80} color="#1b1464" />
-                </div>
-                <div className="profile-info-new">
-                  <h3>Professor Name</h3>
-                  <p>
-                    <strong>ID:</strong> 123456789
-                  </p>
-                  <p>
-                    <strong>Department:</strong> Information Technology
-                  </p>
-                </div>
-              </div>
+              {faculty ? (
+                <>
+                  <h2 className="profile-greeting">Hi, {faculty.name}!</h2>
+                  <div className="profile-card-new">
+                    <div className="profile-icon-new">
+                      {faculty.profile_image_url ? (
+                        <img
+                          src={`http://localhost:3001${faculty.profile_image_url}`}
+                          alt="Profile"
+                          className="profile-picture-new"
+                        />
+                      ) : (
+                        <FaUserCircle size={80} color="#1b1464" />
+                      )}
+                      <input
+                        type="file"
+                        id="profile-upload-faculty"
+                        style={{ display: "none" }}
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            const formData = new FormData();
+                            formData.append("profileImage", file);
+                            try {
+                              const response = await axios.post(
+                                `http://localhost:3001/users/${faculty.id}/profile-image`,
+                                formData
+                              );
+                              setFaculty((prev) => ({
+                                ...prev,
+                                profile_image_url: response.data.imageUrl,
+                              }));
+                              fetchActivityLogs(); // Refresh logs after update
+                              alert("Profile image updated!");
+                            } catch (error) {
+                              console.error("Error uploading image:", error);
+                              alert("Failed to upload image.");
+                            }
+                          }
+                        }}
+                      />
+                      <button
+                        className="upload-btn-new"
+                        onClick={() =>
+                          document
+                            .getElementById("profile-upload-faculty")
+                            .click()
+                        }
+                      >
+                        <FaCamera />
+                      </button>
+                    </div>
+                    <div className="profile-info-new">
+                      <h3>{faculty.name}</h3>
+                      <p>
+                        <strong>ID:</strong> {faculty.id}
+                      </p>
+                      <p>
+                        <strong>Department:</strong> {faculty.department_name}
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p>Loading profile...</p>
+              )}
             </section>
           )}
         </main>

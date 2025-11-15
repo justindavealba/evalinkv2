@@ -2,18 +2,12 @@ import React, { useState } from "react";
 import axios from "axios";
 import "./AddUserModal.css";
 
-export default function AddSubjectModal({
-  onClose,
-  onAddSubject,
-  departments,
-  faculty,
-}) {
+export default function AddSubjectModal({ onClose, onSuccess, departments }) {
   const [formData, setFormData] = useState({
     code: "",
     name: "",
     department_id: "",
     year_level: "",
-    faculty_id: "",
   });
 
   const handleChange = (e) => {
@@ -27,8 +21,7 @@ export default function AddSubjectModal({
       !formData.code.trim() ||
       !formData.name.trim() ||
       !formData.department_id ||
-      !formData.year_level ||
-      !formData.faculty_id
+      !formData.year_level
     ) {
       alert("Please fill out all fields.");
       return;
@@ -38,9 +31,11 @@ export default function AddSubjectModal({
         "http://localhost:3001/subjects",
         formData
       );
-      alert(response.data.message);
-      onAddSubject();
-      onClose();
+      if (response.data.message) {
+        alert(response.data.message);
+        onSuccess(); // Use the unified success handler
+        onClose();
+      }
     } catch (error) {
       console.error("There was an error adding the subject!", error);
       alert("Failed to add subject.");
@@ -86,10 +81,10 @@ export default function AddSubjectModal({
               <option value="" disabled>
                 Select Year Level
               </option>
-              <option value="1st Year">1st Year</option>
-              <option value="2nd Year">2nd Year</option>
-              <option value="3rd Year">3rd Year</option>
-              <option value="4th Year">4th Year</option>
+              <option value="1">1st Year</option>
+              <option value="2">2nd Year</option>
+              <option value="3">3rd Year</option>
+              <option value="4">4th Year</option>
             </select>
           </div>
           <div className="form-group">
@@ -107,25 +102,6 @@ export default function AddSubjectModal({
               {departments.map((dept) => (
                 <option key={dept.id} value={dept.id}>
                   {dept.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="form-group">
-            <label htmlFor="faculty_id">Assign to Faculty</label>
-            <select
-              id="faculty_id"
-              name="faculty_id"
-              value={formData.faculty_id}
-              onChange={handleChange}
-              required
-            >
-              <option value="" disabled>
-                Select Faculty
-              </option>
-              {faculty.map((fac) => (
-                <option key={fac.id} value={fac.id}>
-                  {fac.name}
                 </option>
               ))}
             </select>

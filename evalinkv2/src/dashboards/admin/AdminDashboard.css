@@ -323,9 +323,13 @@
 .evaluation-card,
 .incident-card {
   border: 1px solid var(--border-color);
-  padding: 20px;
+  padding-bottom: 20px;
+  padding-right: 20px;
+  padding-left: 20px;
+  padding-top: 40px;
   border-radius: var(--border-radius);
   background-color: #f9fafb;
+  position: relative; /* Crucial for positioning the label */
 }
 
 .evaluation-card h3,
@@ -366,41 +370,102 @@
 }
 
 /* ===== ACTIVITY LOG SECTION ===== */
-.activity-log-section .activity-item {
+.activity-log-container {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 5px;
+  gap: 16px;
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
   padding: 15px;
   border-radius: 8px;
   background-color: var(--bg-color);
   border: 1px solid var(--border-color);
-  margin-bottom: 10px;
 }
 
-.activity-log-section .activity-item:last-child {
-  margin-bottom: 0;
+.activity-icon {
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.activity-log-section .activity-type {
+.activity-details {
+  display: flex;
+  justify-content: space-between;
+  flex-grow: 1;
+  align-items: center;
+}
+
+.activity-details p {
+  margin: 0;
+}
+
+.activity-type {
+  font-weight: 600;
+}
+
+.activity-time {
+  color: var(--text-light);
+  font-size: 0.9rem;
+  white-space: nowrap;
+  margin-left: 16px;
+}
+
+/* ===== USER MANAGEMENT SECTION ===== */
+.actions-grid {
+  display: flex;
+  gap: 32px;
+  margin-bottom: 32px;
+  padding: 0; /* Remove padding from the grid itself */
+  background-color: var(--bg-color);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+}
+
+.actions-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-right: 32px;
+  margin-left: 32px;
+  margin-top: 10px;
+  margin-bottom: 10px; /* Add margin between groups */
+  flex: 1; /* Allow groups to grow equally */
+}
+
+.actions-group h4 {
+  margin: 0 0 8px 0;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--primary-color);
 }
 
-.activity-log-section .activity-item p {
-  margin: 0;
-  color: var(--text-light);
-  font-size: 0.9rem;
-}
-
-/* ===== USER MANAGEMENT SECTION ===== */
-.user-management-actions {
+.action-item-btn {
   display: flex;
-  gap: 16px;
-  margin-bottom: 32px;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  padding: 10px 16px;
+  border-radius: 6px;
+  background-color: #ffffff; /* Light gray background */
+  border: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-color);
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.user-management-actions button {
+.action-item-btn:hover {
+  background-color: var(--accent-color);
+  color: white;
+}
+
+.add-btn {
   background-color: var(--primary-color);
   color: white;
   border: none;
@@ -411,7 +476,7 @@
   transition: background-color 0.2s ease;
 }
 
-.user-management-actions button:hover {
+.add-btn:hover {
   background-color: var(--accent-color);
 }
 
@@ -499,4 +564,141 @@
 .delete-btn:hover {
   background-color: #fecaca;
   color: #991b1b;
+}
+.edit-btn {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+  margin-right: 8px;
+}
+.edit-btn:hover {
+  background-color: #bfdbfe;
+  color: #1e40af;
+}
+
+.assign-btn {
+  background-color: #d1fae5;
+  color: #065f46;
+  margin-right: 8px;
+}
+
+.assign-btn:hover {
+  background-color: #a7f3d0;
+  color: #047857;
+}
+
+/* ===== USER MANAGEMENT TABS ===== */
+.user-management-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 32px;
+}
+
+.tab-btn {
+  padding: 12px 24px;
+  cursor: pointer;
+  border: none;
+  background-color: transparent;
+  color: var(--text-light);
+  font-weight: 500;
+  font-size: 1rem;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s ease-in-out;
+}
+
+.incident-card-status-label {
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  padding: 6px 12px;
+  border-top-left-radius: var(--border-radius);
+  border-bottom-right-radius: var(--border-radius);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: white;
+}
+
+.status-btn-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.incident-status-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 15px;
+  flex-wrap: wrap;
+}
+
+.status-btn {
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  border-radius: 20px; /* Pill shape */
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  opacity: 0.7;
+  display: flex; /* Add flex to align icon and text */
+  align-items: center;
+  gap: 8px; /* Add space between icon and text */
+}
+
+.status-btn:hover:not(:disabled) {
+  opacity: 1;
+  transform: translateY(-2px);
+}
+
+.status-btn.active {
+  opacity: 1;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  cursor: default;
+  background-color: white !important; /* Turn active button white */
+  border: 1px solid var(--primary-color);
+  color: var(--primary-color) !important;
+  transform: translateY(-2px);
+}
+
+/* Color coding for each status */
+.status-btn.status-pending {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+.incident-card-status-label.status-pending {
+  background-color: #d97706; /* Amber 600 */
+}
+
+.status-btn.status-under-investigation {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+.incident-card-status-label.status-under-investigation {
+  background-color: #2563eb; /* Blue 600 */
+}
+
+.status-btn.status-resolved {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+.incident-card-status-label.status-resolved {
+  background-color: #059669; /* Green 600 */
+}
+
+.tab-btn.active {
+  color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+  font-weight: 600;
+}
+
+.table-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.search-input {
+  padding: 10px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  width: 300px;
 }

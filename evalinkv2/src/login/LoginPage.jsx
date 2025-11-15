@@ -8,12 +8,12 @@ import { FaEye, FaEyeSlash } from "react-icons/fa";
 export default function LoginPage({ setUserRole }) {
   const navigate = useNavigate();
   const [role, setRole] = useState("");
-  const [formData, setFormData] = useState({ username: "", password: "" });
+  const [formData, setFormData] = useState({ identifier: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
 
   const handleRoleSelect = (selectedRole) => {
     setRole(selectedRole);
-    setFormData({ username: "", password: "" }); // Clear form data
+    setFormData({ identifier: "", password: "" }); // Clear form data for all roles
   };
   const handleChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -21,21 +21,25 @@ export default function LoginPage({ setUserRole }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    let payload;
+    if (role === "admin") {
+      payload = { email: formData.identifier, password: formData.password };
+    } else {
+      payload = { id: formData.identifier, password: formData.password };
+    }
+
     try {
       // Single login endpoint
-      const response = await axios.post(
-        "http://localhost:3001/login",
-        formData
-      );
+      const response = await axios.post("http://localhost:3001/login", payload);
 
       if (response.data.message === "Login successful") {
-        const userRole = response.data.role;
-        setUserRole(userRole); // Set global role from server response
+        const user = response.data.user;
+        setUserRole(user.role); // Set global role from server response
 
         // Store user ID for student/faculty
-        localStorage.setItem("userId", formData.username);
+        localStorage.setItem("userId", user.id); // This is correct for all roles
 
-        if (userRole === "student") {
+        if (user.role === "student") {
           const now = new Date();
           const options = {
             year: "numeric",
@@ -52,8 +56,8 @@ export default function LoginPage({ setUserRole }) {
           logs.push({ type: "login", timestamp: loginTime });
           localStorage.setItem("studentActivityLog", JSON.stringify(logs));
           navigate("/student");
-        } else if (userRole === "faculty") navigate("/faculty");
-        else if (userRole === "admin") navigate("/admin");
+        } else if (user.role === "faculty") navigate("/faculty");
+        else if (user.role === "admin") navigate("/admin");
       }
     } catch (error) {
       if (error.response && error.response.data && error.response.data.error) {
@@ -107,9 +111,15 @@ export default function LoginPage({ setUserRole }) {
             <div className="input-group">
               <input
                 type="text"
-                name="username"
-                placeholder="Username"
-                value={formData.username}
+                name="identifier"
+                placeholder={
+                  role === "admin"
+                    ? "Username"
+                    : role === "student"
+                    ? "Student ID"
+                    : "Faculty ID"
+                }
+                value={formData.identifier}
                 onChange={handleChange}
                 required
               />
@@ -141,7 +151,7 @@ export default function LoginPage({ setUserRole }) {
               className="ustp-btn-back"
               onClick={() => {
                 setRole("");
-                setFormData({ username: "", password: "" }); // Clear form data
+                setFormData({ identifier: "", password: "" }); // Clear form data
               }}
             >
               Back to Role Selection

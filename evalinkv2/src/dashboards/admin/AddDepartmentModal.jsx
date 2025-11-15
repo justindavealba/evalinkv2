@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import "./AddUserModal.css";
 
-export default function AddDepartmentModal({ onClose, onAddDepartment }) {
+export default function AddDepartmentModal({ onClose, onSuccess }) {
   const [formData, setFormData] = useState({
     name: "",
   });
@@ -26,7 +26,7 @@ export default function AddDepartmentModal({ onClose, onAddDepartment }) {
         alert("Error adding department: " + response.data.error);
       } else {
         alert(response.data.message);
-        onAddDepartment({ ...formData, id: response.data.data.insertId });
+        onSuccess(); // Call the success handler to refresh the list
         onClose();
       }
     } catch (error) {

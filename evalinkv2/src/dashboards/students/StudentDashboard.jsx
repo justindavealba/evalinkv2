@@ -12,6 +12,8 @@ import {
   FaHistory, // For Activity Log
   FaSignInAlt, // For Login activity
   FaSignOutAlt, // For Logout activity
+  FaClipboardCheck, // For Evaluation
+  FaCamera, // For upload button
 } from "react-icons/fa";
 
 export default function StudentDashboard({ setUserRole }) {
@@ -22,17 +24,11 @@ export default function StudentDashboard({ setUserRole }) {
   const [incidentReports, setIncidentReports] = useState([]);
   const [activityLogs, setActivityLogs] = useState([]);
   const [selectedSubject, setSelectedSubject] = useState(null);
+  const [student, setStudent] = useState(null);
   const [subjects, setSubjects] = useState([]);
+  const [evaluatedSubjects, setEvaluatedSubjects] = useState([]);
 
-  useEffect(() => {
-    const storedReports =
-      JSON.parse(localStorage.getItem("incidentReports")) || [];
-    const storedLogs =
-      JSON.parse(localStorage.getItem("studentActivityLog")) || [];
-    setIncidentReports(storedReports);
-    setActivityLogs(storedLogs);
-
-    // Fetch enrolled subjects
+  const fetchSubjects = () => {
     const studentId = localStorage.getItem("userId");
     if (studentId) {
       axios
@@ -42,26 +38,85 @@ export default function StudentDashboard({ setUserRole }) {
         })
         .catch((error) => console.error("Error fetching subjects:", error));
     }
+  };
+
+  const fetchEvaluatedSubjects = () => {
+    const studentId = localStorage.getItem("userId");
+    if (studentId) {
+      axios
+        .get(`http://localhost:3001/students/${studentId}/evaluated-subjects`)
+        .then((response) => {
+          setEvaluatedSubjects(response.data);
+        })
+        .catch((error) =>
+          console.error("Error fetching evaluated subjects:", error)
+        );
+    }
+  };
+
+  const fetchIncidents = () => {
+    const studentId = localStorage.getItem("userId");
+    if (studentId) {
+      axios
+        .get(`http://localhost:3001/incidents/student/${studentId}`)
+        .then((response) => {
+          setIncidentReports(response.data);
+        })
+        .catch((error) => console.error("Error fetching incidents:", error));
+    }
+  };
+
+  const fetchActivityLogs = () => {
+    const studentId = localStorage.getItem("userId");
+    if (studentId) {
+      axios
+        .get(`http://localhost:3001/users/${studentId}/activity-logs`)
+        .then((response) => {
+          setActivityLogs(response.data);
+        })
+        .catch((error) =>
+          console.error("Error fetching activity logs:", error)
+        );
+    }
+  };
+
+  useEffect(() => {
+    const studentId = localStorage.getItem("userId");
+
+    if (studentId) {
+      // Fetch student details
+      axios
+        .get(`http://localhost:3001/users/${studentId}`)
+        .then((response) => {
+          setStudent(response.data);
+        })
+        .catch((error) => console.error("Error fetching student data:", error));
+
+      // Fetch enrolled subjects
+      fetchSubjects();
+      fetchEvaluatedSubjects();
+      fetchIncidents();
+      fetchActivityLogs();
+    }
   }, []);
 
-  const handleLogout = () => {
-    const now = new Date();
-    const options = {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    };
-    const logoutTime = now.toLocaleString("en-US", options);
-
-    const logs = JSON.parse(localStorage.getItem("studentActivityLog")) || [];
-    logs.push({ type: "logout", timestamp: logoutTime });
-    localStorage.setItem("studentActivityLog", JSON.stringify(logs));
-
-    if (setUserRole) setUserRole("");
-    navigate("/login");
+  const handleLogout = async () => {
+    const studentId = localStorage.getItem("userId");
+    try {
+      // Log the logout event to the database
+      await axios.post("http://localhost:3001/activity-logs", {
+        userId: studentId,
+        activityType: "logout",
+        description: "User logged out.",
+      });
+    } catch (error) {
+      console.error("Failed to log logout activity:", error);
+    } finally {
+      // Proceed with logout regardless of whether logging was successful
+      if (setUserRole) setUserRole("");
+      localStorage.removeItem("userId");
+      navigate("/login");
+    }
   };
 
   return (
@@ -79,7 +134,7 @@ export default function StudentDashboard({ setUserRole }) {
 
         <div className="navbar-center">
           <div className="brand-text">
-            <h1>Faculty Evaluation System</h1>
+            <h1>Student Evaluation Portal</h1>
           </div>
         </div>
 
@@ -89,7 +144,15 @@ export default function StudentDashboard({ setUserRole }) {
               className="profile-icon"
               onClick={() => setShowDropdown(!showDropdown)}
             >
-              <FaUserCircle size={28} />
+              {student && student.profile_image_url ? (
+                <img
+                  src={`http://localhost:3001${student.profile_image_url}`}
+                  alt="Profile"
+                  className="header-profile-picture"
+                />
+              ) : (
+                <FaUserCircle size={28} />
+              )}
             </button>
 
             {showDropdown && (
@@ -150,11 +213,45 @@ export default function StudentDashboard({ setUserRole }) {
           {/* ===== OVERVIEW ===== */}
           {activeTab === "overview" && (
             <section className="overview-section">
-              <h2>Overview</h2>
-              <p>
-                Welcome to your dashboard! Here you can view subjects, submit
-                incident reports, and track activity logs.
-              </p>
+              <h2>Dashboard Overview</h2>
+              <div className="overview-grid">
+                <div
+                  className="stat-card-student"
+                  onClick={() => setActiveTab("subjects")}
+                >
+                  <div className="stat-card-student-icon">
+                    <FaBook />
+                  </div>
+                  <div className="stat-card-student-info">
+                    <h4>Enrolled Subjects</h4>
+                    <p>{subjects.length}</p>
+                  </div>
+                </div>
+                <div
+                  className="stat-card-student"
+                  onClick={() => setActiveTab("subjects")}
+                >
+                  <div className="stat-card-student-icon">
+                    <FaClipboardCheck />
+                  </div>
+                  <div className="stat-card-student-info">
+                    <h4>Evaluations to Do</h4>
+                    <p>{subjects.length - evaluatedSubjects.length}</p>
+                  </div>
+                </div>
+                <div
+                  className="stat-card-student"
+                  onClick={() => setActiveTab("report")}
+                >
+                  <div className="stat-card-student-icon">
+                    <FaExclamationTriangle />
+                  </div>
+                  <div className="stat-card-student-info">
+                    <h4>My Reports</h4>
+                    <p>{incidentReports.length}</p>
+                  </div>
+                </div>
+              </div>
             </section>
           )}
 
@@ -163,18 +260,28 @@ export default function StudentDashboard({ setUserRole }) {
             <section className="subjects-section">
               <h2>Enrolled Subjects</h2>
               <div className="subjects">
-                {subjects.map((subject) => (
-                  <div key={subject.code} className="subject-card">
-                    <h3>{subject.name}</h3>
-                    <p>Instructor: {subject.instructor || "Not Assigned"}</p>
-                    <button
-                      className="evaluate-btn"
-                      onClick={() => setSelectedSubject(subject)}
-                    >
-                      Evaluate
-                    </button>
-                  </div>
-                ))}
+                {subjects.map((subject) => {
+                  const isEvaluated = evaluatedSubjects.includes(subject.id);
+                  return (
+                    <div key={subject.id} className="subject-card">
+                      <h3>{subject.name}</h3>
+                      <p>
+                        Instructor: {subject.faculty_name || "Not Assigned"}
+                      </p>
+                      <button
+                        className={`evaluate-btn ${
+                          isEvaluated ? "disabled" : ""
+                        }`}
+                        onClick={() =>
+                          !isEvaluated && setSelectedSubject(subject)
+                        }
+                        disabled={isEvaluated}
+                      >
+                        {isEvaluated ? "Evaluated" : "Evaluate"}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </section>
           )}
@@ -185,21 +292,30 @@ export default function StudentDashboard({ setUserRole }) {
               <h2>Incident Report</h2>
               <form
                 className="incident-form"
-                onSubmit={(e) => {
+                onSubmit={async (e) => {
                   e.preventDefault();
                   const formData = new FormData(e.target);
                   const report = {
+                    student_id: localStorage.getItem("userId"),
                     title: formData.get("title"),
                     description: formData.get("description"),
-                    date: new Date().toLocaleString(),
                   };
-                  const updatedReports = [...incidentReports, report];
-                  setIncidentReports(updatedReports);
-                  localStorage.setItem(
-                    "incidentReports",
-                    JSON.stringify(updatedReports)
-                  );
-                  e.target.reset();
+                  try {
+                    const response = await axios.post(
+                      "http://localhost:3001/incidents",
+                      report
+                    );
+                    fetchActivityLogs(); // Refresh logs after reporting
+                    alert(response.data.message);
+                    fetchIncidents(); // Refresh the list from the database
+                    e.target.reset();
+                  } catch (error) {
+                    console.error("Error submitting incident:", error);
+                    alert(
+                      error.response?.data?.error ||
+                        "Failed to submit incident."
+                    );
+                  }
                 }}
               >
                 <label>Title</label>
@@ -223,7 +339,14 @@ export default function StudentDashboard({ setUserRole }) {
                 <h4>Report History</h4>
                 {incidentReports.length > 0 ? (
                   incidentReports.map((r, i) => (
-                    <div key={i} className="incident-item">
+                    <div key={r.id || i} className="incident-item">
+                      <span
+                        className={`incident-item-status-label status-${r.status
+                          .toLowerCase()
+                          .replace(" ", "-")}`}
+                      >
+                        {r.status}
+                      </span>
                       <strong>{r.title}</strong> <em>{r.date}</em>
                       <p>{r.description}</p>
                     </div>
@@ -242,19 +365,27 @@ export default function StudentDashboard({ setUserRole }) {
               <div className="activity-log-container">
                 {activityLogs.length > 0 ? (
                   activityLogs.map((log, index) => (
-                    <div key={index} className={`activity-item ${log.type}`}>
+                    <div
+                      key={index}
+                      className={`activity-item ${log.activity_type}`}
+                    >
                       <div className="activity-icon">
-                        {log.type === "login" ? (
-                          <FaSignInAlt color="#28a745" />
-                        ) : (
-                          <FaSignOutAlt color="#dc3545" />
-                        )}
+                        {
+                          {
+                            login: <FaSignInAlt color="#28a745" />,
+                            logout: <FaSignOutAlt color="#dc3545" />,
+                            evaluation: <FaClipboardCheck color="#007bff" />,
+                            report_incident: (
+                              <FaExclamationTriangle color="#ffc107" />
+                            ),
+                            update_profile: <FaUserCircle color="#6c757d" />,
+                          }[log.activity_type] || (
+                            <FaHistory color="#6c757d" />
+                          ) /* Default icon */
+                        }
                       </div>
                       <div className="activity-details">
-                        <span className="activity-type">
-                          Student
-                          {log.type === "login" ? " Logged In" : " Logged Out"}
-                        </span>
+                        <span className="activity-type">{log.description}</span>
                         <span className="activity-time">{log.timestamp}</span>
                       </div>
                     </div>
@@ -269,24 +400,82 @@ export default function StudentDashboard({ setUserRole }) {
           {/* ===== PROFILE PAGE ===== */}
           {activeTab === "profile" && (
             <section className="profile-section-content">
-              <h2 className="profile-greeting">Hi, Alexa!</h2>
-              <div className="profile-card-new">
-                <div className="profile-icon-new">
-                  <FaUserCircle size={80} color="#1b1464" />
-                </div>
-                <div className="profile-info-new">
-                  <h3>Alexa Guevarra</h3>
-                  <p>
-                    <strong>ID:</strong> 202213079
-                  </p>
-                  <p>
-                    <strong>Year:</strong> 3rd Year
-                  </p>
-                  <p>
-                    <strong>Semester:</strong> 1st Semester 2025-2026
-                  </p>
-                </div>
-              </div>
+              {student ? (
+                <>
+                  <h2 className="profile-greeting">
+                    {" "}
+                    {/* This was the cause of the error */}
+                    Hi, {student.name.split(" ")[0]}!
+                  </h2>
+                  <div className="profile-card-new">
+                    <div
+                      className="profile-icon-new"
+                      style={{ position: "relative" }}
+                    >
+                      {student.profile_image_url ? (
+                        <img
+                          src={`http://localhost:3001${student.profile_image_url}`}
+                          alt="Profile"
+                          className="profile-picture-new"
+                        />
+                      ) : (
+                        <FaUserCircle size={80} color="#1b1464" />
+                      )}
+                      <input
+                        type="file"
+                        id="profile-upload"
+                        style={{ display: "none" }}
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            const formData = new FormData();
+                            formData.append("profileImage", file);
+                            try {
+                              const response = await axios.post(
+                                `http://localhost:3001/users/${student.id}/profile-image`,
+                                formData
+                              );
+                              fetchActivityLogs(); // Refresh logs after update
+                              // Update student state to show new image instantly
+                              setStudent((prev) => ({
+                                ...prev,
+                                profile_image_url: response.data.imageUrl,
+                              }));
+                              alert("Profile image updated!");
+                            } catch (error) {
+                              console.error("Error uploading image:", error);
+                              alert("Failed to upload image.");
+                            }
+                          }
+                        }}
+                      />
+                      <button
+                        className="upload-btn-new"
+                        onClick={() =>
+                          document.getElementById("profile-upload").click()
+                        }
+                      >
+                        <FaCamera />
+                      </button>
+                    </div>
+                    <div className="profile-info-new">
+                      <h3>{student.name}</h3>
+                      <p>
+                        <strong>ID:</strong> {student.id}
+                      </p>
+                      <p>
+                        <strong>Year:</strong> {student.year_level}
+                      </p>
+                      <p>
+                        <strong>Department:</strong> {student.department_name}
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p>Loading profile...</p>
+              )}
             </section>
           )}
         </main>
@@ -296,6 +485,11 @@ export default function StudentDashboard({ setUserRole }) {
         <EvaluateInstructor
           subject={selectedSubject}
           onClose={() => setSelectedSubject(null)}
+          onSuccess={() => {
+            fetchSubjects();
+            fetchEvaluatedSubjects(); // Re-fetch evaluated subjects after a successful submission
+            fetchActivityLogs(); // Refresh logs after evaluation
+          }}
         />
       )}
     </div>
